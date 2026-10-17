@@ -40,9 +40,9 @@ Apps rebuild a position by replaying its history through `stateTransition`. Vali
 
 Arrow and Google Truth were removed. The library ships with only the Kotlin standard library, and tests use `kotlin-test-junit`.
 
-## Go uses Tromp–Taylor rules; draughts uses international rules
+## Go uses Tromp–Taylor or Chinese rules; draughts uses international rules
 
-These are the rule sets the domains implement. Tromp–Taylor scores by area, so no agreement about dead stones is needed.
+These are the rule sets the domains implement. Both Go rule sets score by area, so no agreement about dead stones is needed, and both use positional superko for the Chinese rule against repeating a position. They differ only in self-capture, which Chinese rules forbid. Tromp–Taylor stays the default so existing callers keep the same legal moves and results; apps that want Chinese rules pass `GoRules.CHINESE`.
 
 ## Havannah finds rings in two passes
 

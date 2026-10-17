@@ -6,18 +6,24 @@ import com.castlefrog.agl.domains.nextPlayerTurnSequential
 import com.castlefrog.agl.requireLegalAction
 
 /**
- * Tromp–Taylor Go (logical rules), with a configurable square board.
+ * Go (logical rules), with a configurable square board and rule set.
  *
  * Default board is 19×19. A turn is a pass, or a play that does not repeat an
  * earlier whole-board coloring (positional superko). A play colors an empty
  * point, then clears opponent stones with no liberties, then own stones with
- * no liberties — suicide is legal when the resulting coloring is new. Two
- * consecutive passes end the game. Scoring is area (stones + empty points that
- * reach only that color). [komi] is added to white (7 by default).
+ * no liberties. Two consecutive passes end the game. Scoring is area (stones +
+ * empty points that reach only that color). [komi] is added to white (7 by default).
+ *
+ * [rules] decides self-capture:
+ * - [GoRules.TROMP_TAYLOR] (default): self-capture is legal when the resulting
+ *   coloring is new; the mover's group with no liberties is removed.
+ * - [GoRules.CHINESE]: self-capture is illegal. A play is legal only if, after
+ *   opponent groups with no liberties are removed, the placed stone's group has a liberty.
  */
 class GoSimulator(
     val boardSize: Int = GoState.DEFAULT_BOARD_SIZE,
-    val komi: Double = DEFAULT_KOMI
+    val komi: Double = DEFAULT_KOMI,
+    val rules: GoRules = GoRules.TROMP_TAYLOR
 ) : Simulator<GoState, GoAction> {
 
     init {
@@ -180,6 +186,10 @@ class GoSimulator(
             board = Array(state.boardSize) { state.board[it].copyOf() }
         )
         applyPlacement(trial, x, y, stone)
+        // Own stones with no liberties are cleared last, so a self-capture leaves (x, y) empty.
+        if (rules == GoRules.CHINESE && trial.get(x, y) == GoState.LOCATION_EMPTY) {
+            return false
+        }
         return !state.coloringHasOccurred(trial.boardSnapshot())
     }
 
