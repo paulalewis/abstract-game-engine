@@ -123,4 +123,222 @@ class ChessSimulatorTest {
         assertEquals(ChessState.KNIGHT.toByte(), state.get(5, 2))
         assertEquals(ChessState.EMPTY, state.get(6, 0))
     }
+
+    private fun play(simulator: ChessSimulator, state: ChessState, vararg moves: ChessAction): ChessState {
+        var s = state
+        for (move in moves) {
+            val actions = if (s.agentTurn == ChessState.TURN_WHITE) listOf(move, null) else listOf(null, move)
+            s = simulator.stateTransition(s, actions)
+        }
+        return s
+    }
+
+    private fun isOver(simulator: ChessSimulator, state: ChessState): Boolean =
+        simulator.calculateLegalActions(state).all { it.isEmpty() }
+
+    private val whiteKnightOut = ChessAction(6, 0, 5, 2) // Ng1-f3
+    private val whiteKnightBack = ChessAction(5, 2, 6, 0) // Nf3-g1
+    private val blackKnightOut = ChessAction(6, 7, 5, 5) // Ng8-f6
+    private val blackKnightBack = ChessAction(5, 5, 6, 7) // Nf6-g8
+
+    @Test
+    fun knightShuffleDrawsOnThirdOccurrenceOfStartingPosition() {
+        val simulator = ChessSimulator()
+        var state = simulator.initialState
+        val cycle = listOf(whiteKnightOut, blackKnightOut, whiteKnightBack, blackKnightBack)
+        // First cycle: starting position occurs for the second time. Nothing has occurred three times.
+        for (move in cycle) {
+            assertFalse(isOver(simulator, state))
+            state = play(simulator, state, move)
+        }
+        assertEquals(simulator.initialState.board.map { it.toList() }, state.board.map { it.toList() })
+        assertFalse(isOver(simulator, state))
+        // Second cycle: every position before the last occurs only twice.
+        for (move in cycle) {
+            assertFalse(isOver(simulator, state))
+            state = play(simulator, state, move)
+        }
+        // Starting position for the third time: drawn.
+        assertEquals(8, state.positionHistory.size)
+        assertTrue(simulator.isThreefoldRepetition(state))
+        assertTrue(isOver(simulator, state))
+        assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(whiteKnightOut, null))
+        }
+    }
+
+    @Test
+    fun pawnMoveClearsPositionHistory() {
+        val simulator = ChessSimulator()
+        var state = play(
+            simulator,
+            simulator.initialState,
+            whiteKnightOut, blackKnightOut, whiteKnightBack, blackKnightBack // start position, 2nd time
+        )
+        assertEquals(4, state.positionHistory.size)
+        state = play(simulator, state, ChessAction(4, 1, 4, 3)) // e2-e4
+        assertEquals(0, state.halfmoveClock)
+        assertTrue(state.positionHistory.isEmpty())
+        // The position after e4 needs three occurrences of its own.
+        state = play(simulator, state, blackKnightOut, whiteKnightOut, blackKnightBack, whiteKnightBack)
+        assertFalse(isOver(simulator, state))
+        state = play(simulator, state, blackKnightOut, whiteKnightOut, blackKnightBack)
+        assertFalse(isOver(simulator, state))
+        state = play(simulator, state, whiteKnightBack)
+        assertTrue(isOver(simulator, state))
+    }
+
+    @Test
+    fun captureClearsPositionHistory() {
+        val simulator = ChessSimulator()
+        // 1. Nf3 Nf6 2. Ng1 Ng8 3. Nc3 d5 4. Nxd5
+        var state = play(
+            simulator,
+            simulator.initialState,
+            whiteKnightOut, blackKnightOut, whiteKnightBack, blackKnightBack,
+            ChessAction(1, 0, 2, 2), // Nb1-c3
+            ChessAction(3, 6, 3, 4) // d7-d5
+        )
+        state = play(simulator, state, ChessAction(2, 2, 3, 4)) // Nc3xd5
+        assertEquals(0, state.halfmoveClock)
+        assertTrue(state.positionHistory.isEmpty())
+        state = play(simulator, state, ChessAction(1, 7, 2, 5)) // Nb8-c6, a quiet move is recorded again
+        assertEquals(1, state.positionHistory.size)
+    }
+
+    @Test
+    fun lostCastlingRightsMakePositionsDiffer() {
+        val simulator = ChessSimulator()
+        // 1. e4 e5, then the kings walk out and back, losing castling rights.
+        var state = play(simulator, simulator.initialState, ChessAction(4, 1, 4, 3), ChessAction(4, 6, 4, 4))
+        val kingCycle = arrayOf(
+            ChessAction(4, 0, 4, 1), // Ke1-e2
+            ChessAction(4, 7, 4, 6), // Ke8-e7
+            ChessAction(4, 1, 4, 0), // Ke2-e1
+            ChessAction(4, 6, 4, 7) // Ke7-e8
+        )
+        state = play(simulator, state, *kingCycle)
+        state = play(simulator, state, *kingCycle)
+        // The board after 1. e4 e5 has now occurred three times, but only twice without castling rights.
+        assertEquals(0, state.castlingRights)
+        assertFalse(simulator.isThreefoldRepetition(state))
+        assertFalse(isOver(simulator, state))
+        // Ke2 with no castling rights left has occurred only twice; the first time black could still castle.
+        state = play(simulator, state, kingCycle[0])
+        assertFalse(isOver(simulator, state))
+        // Kings on e2 and e7 with no castling rights: third time.
+        state = play(simulator, state, kingCycle[1])
+        assertTrue(isOver(simulator, state))
+    }
+
+    @Test
+    fun sideToMoveMakesPositionsDiffer() {
+        val simulator = ChessSimulator()
+        // White king walks a triangle a1-b1-b2-a1 while black's king shuffles h8-g8-h8, so the
+        // starting board recurs with either side to move.
+        val start = ChessState()
+        for (x in 0 until 8) for (y in 0 until 8) start.set(x, y, ChessState.EMPTY)
+        start.set(0, 0, ChessState.KING.toByte())
+        start.set(7, 7, (-ChessState.KING).toByte())
+        start.castlingRights = 0
+        val whiteMoves = listOf(ChessAction(0, 0, 1, 0), ChessAction(1, 0, 1, 1), ChessAction(1, 1, 0, 0))
+        val blackMoves = listOf(ChessAction(7, 7, 6, 7), ChessAction(6, 7, 7, 7))
+        var state = start
+        var ply = 0
+        val startBoard = start.board.map { it.toList() }
+        var startBoardSeen = 1
+        while (!isOver(simulator, state)) {
+            val move = if (ply % 2 == 0) whiteMoves[(ply / 2) % 3] else blackMoves[(ply / 2) % 2]
+            state = play(simulator, state, move)
+            ply++
+            if (state.board.map { it.toList() } == startBoard) startBoardSeen++
+        }
+        // Plies 0, 5, 12, 17 and 24 show the starting board; only plies 0, 12 and 24 have white to move.
+        assertEquals(24, ply)
+        assertEquals(5, startBoardSeen)
+        assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
+    }
+
+    @Test
+    fun unusableEnPassantDoesNotMakePositionsDiffer() {
+        val simulator = ChessSimulator()
+        // 1. e4: en passant file is set, but no black pawn can capture.
+        var state = play(simulator, simulator.initialState, ChessAction(4, 1, 4, 3))
+        assertEquals(4, state.enPassantX)
+        val cycle = arrayOf(blackKnightOut, whiteKnightOut, blackKnightBack, whiteKnightBack)
+        state = play(simulator, state, *cycle)
+        assertEquals(-1, state.enPassantX)
+        assertFalse(isOver(simulator, state))
+        state = play(simulator, state, *cycle)
+        // Third occurrence of the position after 1. e4, counting the one with the unusable en passant file.
+        assertTrue(isOver(simulator, state))
+    }
+
+    @Test
+    fun usableEnPassantMakesPositionsDiffer() {
+        val simulator = ChessSimulator()
+        // 1. Nc3 e5 2. Nb1 e4 3. d4: black's e-pawn can capture en passant on d3.
+        var state = play(
+            simulator,
+            simulator.initialState,
+            ChessAction(1, 0, 2, 2),
+            ChessAction(4, 6, 4, 4),
+            ChessAction(2, 2, 1, 0),
+            ChessAction(4, 4, 4, 3),
+            ChessAction(3, 1, 3, 3)
+        )
+        assertTrue(simulator.calculateLegalActions(state)[1].contains(ChessAction(4, 3, 3, 2)))
+        val cycle = arrayOf(blackKnightOut, whiteKnightOut, blackKnightBack, whiteKnightBack)
+        state = play(simulator, state, *cycle)
+        state = play(simulator, state, *cycle)
+        // Same board three times, but only twice without the en passant capture available.
+        assertFalse(isOver(simulator, state))
+        // The position after ...Nf6 has no en passant in any occurrence: third time.
+        state = play(simulator, state, blackKnightOut)
+        assertTrue(isOver(simulator, state))
+    }
+
+    @Test
+    fun pinnedEnPassantCapturerDoesNotCountInPositionKey() {
+        val simulator = ChessSimulator()
+        // White king a5, white pawn b5, black rook h5, black pawn c7, black king h8; black to move.
+        var state = ChessState()
+        for (x in 0 until 8) for (y in 0 until 8) state.set(x, y, ChessState.EMPTY)
+        state.set(0, 4, ChessState.KING.toByte())
+        state.set(1, 4, ChessState.PAWN.toByte())
+        state.set(7, 4, (-ChessState.ROOK).toByte())
+        state.set(2, 6, (-ChessState.PAWN).toByte())
+        state.set(7, 7, (-ChessState.KING).toByte())
+        state.agentTurn = ChessState.TURN_BLACK
+        state.castlingRights = 0
+        state = play(simulator, state, ChessAction(2, 6, 2, 4)) // c7-c5
+        assertEquals(2, state.enPassantX)
+        // bxc6 e.p. would expose the white king along the 5th rank, so it is not legal.
+        assertFalse(simulator.calculateLegalActions(state)[0].contains(ChessAction(1, 4, 2, 5)))
+        val noEnPassant = state.copy()
+        noEnPassant.enPassantX = -1
+        assertEquals(simulator.positionKey(noEnPassant), simulator.positionKey(state))
+    }
+
+    @Test
+    fun mateThatCompletesRepetitionStillWins() {
+        val simulator = ChessSimulator()
+        val state = ChessState()
+        // KR vs K: white king a6, white rook h7, black king a8. Quiet Rh7-h8# mates.
+        for (x in 0 until 8) for (y in 0 until 8) state.set(x, y, ChessState.EMPTY)
+        state.set(0, 5, ChessState.KING.toByte())
+        state.set(7, 6, ChessState.ROOK.toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        state.castlingRights = 0
+        state.halfmoveClock = 10
+        val matedKey = simulator.positionKey(simulator.applyMove(state, ChessAction(7, 6, 7, 7)))
+        // Pretend the mated position has occurred twice before.
+        state.positionHistory.add(matedKey)
+        state.positionHistory.add(matedKey)
+        val mated = simulator.stateTransition(state, listOf(ChessAction(7, 6, 7, 7), null))
+        assertTrue(simulator.isThreefoldRepetition(mated))
+        assertTrue(isOver(simulator, mated))
+        assertArrayEquals(intArrayOf(1, -1), simulator.calculateRewards(mated))
+    }
 }

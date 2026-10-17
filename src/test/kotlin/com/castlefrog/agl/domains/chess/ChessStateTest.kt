@@ -33,4 +33,18 @@ class ChessStateTest {
         assertEquals("r n b q k b n r", lines[0])
         assertEquals("R N B Q K B N R", lines[7])
     }
+
+    @Test
+    fun copyEqualsAndHashCodeIncludePositionHistory() {
+        val state = ChessState()
+        state.positionHistory.add("a")
+        val copy = state.copy()
+        assertEquals(state, copy)
+        assertEquals(state.hashCode(), copy.hashCode())
+        assertNotSame(state.positionHistory, copy.positionHistory)
+        copy.positionHistory.add("b")
+        assertEquals(listOf("a"), state.positionHistory)
+        assertNotEquals(state, copy)
+        assertNotEquals(state.hashCode(), copy.hashCode())
+    }
 }
