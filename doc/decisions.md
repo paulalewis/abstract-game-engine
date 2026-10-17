@@ -47,3 +47,11 @@ These are the rule sets the domains implement. Tromp–Taylor scores by area, so
 ## Havannah finds rings in two passes
 
 A ring may enclose empty cells, the opponent's stones, or the player's own stones. The first pass flood-fills everything that is not the mover's stone and looks for an area touching no edge; it finds any ring whose inside holds at least one cell that is not the mover's. The second pass finds the rest: if every enclosed cell is the mover's, each of them has six neighbours of the mover's colour, which is itself a ring. Flood-filling around each connected group of the mover's stones does not work, because an own stone inside a ring touches the ring and joins its group, leaving nothing enclosed.
+
+## Draws are automatic
+
+Chess's fifty-move rule and the draughts draw rules end the game as soon as the condition holds, with neutral rewards and no legal actions. Over the board a player must claim these draws; here no player can claim, and agents doing random playouts would otherwise never finish drawn endgames such as king against king. A player with no legal move still loses on the same turn.
+
+## Draw history lives in the state
+
+Draughts repetition needs earlier positions. They are kept in `DraughtsState`, reset by any man move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."

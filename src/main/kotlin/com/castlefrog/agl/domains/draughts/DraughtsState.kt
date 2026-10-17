@@ -11,13 +11,28 @@ import com.castlefrog.agl.State
  *
  * When [mustContinueFromX] is non-negative, that piece must continue a multi-jump.
  * Squares in [pendingCaptures] still hold the jumped pieces until the sequence ends.
+ *
+ * The draw rules use [positionHistory], [kingMoveCount], [endgameGroup], and
+ * [endgameMoveCount]. They change only when a turn ends, never in the middle of a
+ * multi-jump.
  */
 class DraughtsState(
     val board: Array<ByteArray> = initialBoard(),
     var agentTurn: Byte = TURN_WHITE,
     var mustContinueFromX: Int = -1,
     var mustContinueFromY: Int = -1,
-    val pendingCaptures: MutableSet<Int> = mutableSetOf()
+    val pendingCaptures: MutableSet<Int> = mutableSetOf(),
+    /**
+     * [positionKey] of each earlier position, at the start of a turn, since the last
+     * man move or capture. The current position is not included.
+     */
+    val positionHistory: MutableList<String> = mutableListOf(),
+    /** Plies in a row that were king moves without a capture. */
+    var kingMoveCount: Int = 0,
+    /** Endgame material group of the board: [ENDGAME_NONE], [ENDGAME_SIXTEEN], or [ENDGAME_FIVE]. */
+    var endgameGroup: Byte = ENDGAME_NONE,
+    /** Plies played since the board first reached [endgameGroup]. */
+    var endgameMoveCount: Int = 0
 ) : State<DraughtsState> {
 
     companion object {
@@ -29,6 +44,15 @@ class DraughtsState(
         const val BLACK_KING: Byte = 4
         const val TURN_WHITE: Byte = 0
         const val TURN_BLACK: Byte = 1
+
+        /** No endgame limit applies. */
+        const val ENDGAME_NONE: Byte = 0
+
+        /** Three kings, two kings and a man, or a king and two men, against one king. */
+        const val ENDGAME_SIXTEEN: Byte = 1
+
+        /** Two kings, a king and a man, or one king, against one king. */
+        const val ENDGAME_FIVE: Byte = 2
 
         fun initialBoard(): Array<ByteArray> {
             val board = Array(SIZE) { ByteArray(SIZE) }
@@ -56,8 +80,24 @@ class DraughtsState(
             agentTurn,
             mustContinueFromX,
             mustContinueFromY,
-            pendingCaptures.toMutableSet()
+            pendingCaptures.toMutableSet(),
+            positionHistory.toMutableList(),
+            kingMoveCount,
+            endgameGroup,
+            endgameMoveCount
         )
+    }
+
+    /** The pieces on every square and the player to move, as a string; equal keys are the same position. */
+    fun positionKey(): String {
+        val sb = StringBuilder(1 + SIZE * SIZE)
+        sb.append(agentTurn.toInt())
+        for (column in board) {
+            for (square in column) {
+                sb.append(square.toInt())
+            }
+        }
+        return sb.toString()
     }
 
     fun isOnBoard(x: Int, y: Int): Boolean = x in 0 until SIZE && y in 0 until SIZE
@@ -82,6 +122,9 @@ class DraughtsState(
         if (agentTurn != other.agentTurn) return false
         if (mustContinueFromX != other.mustContinueFromX || mustContinueFromY != other.mustContinueFromY) return false
         if (pendingCaptures != other.pendingCaptures) return false
+        if (positionHistory != other.positionHistory) return false
+        if (kingMoveCount != other.kingMoveCount) return false
+        if (endgameGroup != other.endgameGroup || endgameMoveCount != other.endgameMoveCount) return false
         for (i in 0 until SIZE) {
             if (!board[i].contentEquals(other.board[i])) return false
         }
@@ -93,6 +136,10 @@ class DraughtsState(
         result = 31 * result + mustContinueFromX
         result = 31 * result + mustContinueFromY
         result = 31 * result + pendingCaptures.hashCode()
+        result = 31 * result + positionHistory.hashCode()
+        result = 31 * result + kingMoveCount
+        result = 31 * result + endgameGroup
+        result = 31 * result + endgameMoveCount
         for (i in 0 until SIZE) {
             result = 31 * result + board[i].contentHashCode()
         }
