@@ -113,6 +113,23 @@ class HavannahSimulator(
                 }
             }
         }
+
+        // The check above misses a ring whose enclosed cells all hold the mover's stones. Every
+        // such cell has six neighbours holding the mover's stones, and those six form a ring.
+        val moverStone = (nextPlayerTurnSequential(state.agentTurn.toInt(), NUMBER_OF_PLAYERS) + 1).toByte()
+        for (y in 0 until size) {
+            val xMin = if (y >= state.base) y - state.base + 1 else 0
+            val xMax = if (y >= state.base) size else state.base + y
+            for (x in xMin until xMax) {
+                if (isSurroundedBy(x, y, moverStone, state)) {
+                    return if (moverStone == HavannahState.LOCATION_BLACK) {
+                        AdversarialRewards.firstPlayerWins()
+                    } else {
+                        AdversarialRewards.secondPlayerWins()
+                    }
+                }
+            }
+        }
         return AdversarialRewards.neutral()
     }
 
@@ -197,6 +214,25 @@ class HavannahSimulator(
                 }
             }
             return value
+        }
+
+        /** True if all six neighbours of (x, y) are on the board and hold [stone]. */
+        private fun isSurroundedBy(x: Int, y: Int, stone: Byte, state: HavannahState): Boolean {
+            val size = 2 * state.base - 1
+            for (i in -1..1) {
+                for (j in -1..1) {
+                    if (i + j != 0) {
+                        val xi = x + i
+                        val yi = y + j
+                        val onBoard = xi >= 0 && yi >= 0 && xi < size && yi < size &&
+                            (yi < state.base && xi < state.base + yi || yi >= state.base && xi > yi - state.base)
+                        if (!onBoard || state.locations[xi][yi] != stone) {
+                            return false
+                        }
+                    }
+                }
+            }
+            return true
         }
 
         private fun getCornerMask(x: Int, y: Int, corners: Array<IntArray>): Int {
