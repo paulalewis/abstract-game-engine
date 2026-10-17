@@ -15,7 +15,7 @@ Dependencies point inward: domains and agents depend on core; core depends on no
 
 Data flow for one step: a caller asks the simulator for legal actions, an agent picks one, the caller builds a per-player actions list and calls `stateTransition`. The simulator validates the action for the player to move with `requireLegalAction`, copies the state, applies the move to the copy, and returns it. Rewards and terminality are computed from the state alone, with no cache.
 
-`isLegalAction` defaults to generating every legal action and looking the given one up. A domain overrides it when one action can be checked more cheaply. Go does, with one trial board and one superko scan; Hex does, by checking the one cell and the game-over test. Domains on the default still pass `calculateLegalActions` to `requireLegalAction`.
+`isLegalAction` defaults to generating every legal action and looking the given one up. A domain overrides it when one action can be checked more cheaply. Go does, with one trial board and one superko scan; Hex and Havannah do, by checking the one cell and the game-over test. Domains on the default still pass `calculateLegalActions` to `requireLegalAction`.
 
 Domain-specific state:
 

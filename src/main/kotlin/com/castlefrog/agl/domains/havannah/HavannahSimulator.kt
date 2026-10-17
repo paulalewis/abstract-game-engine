@@ -162,10 +162,24 @@ class HavannahSimulator(
         return legalActions
     }
 
+    override fun isLegalAction(state: HavannahState, agentTurn: Int, action: HavannahAction): Boolean {
+        if (agentTurn != state.agentTurn.toInt()) {
+            return false
+        }
+        val x = action.x.toInt()
+        val y = action.y.toInt()
+        if (!isOnBoard(x, y, state)) {
+            return false
+        }
+        if (!state.isLocationEmpty(x, y) && !isSwapAllowed(state)) {
+            return false
+        }
+        return calculateRewards(state).contentEquals(AdversarialRewards.neutral())
+    }
+
     override fun stateTransition(state: HavannahState, actions: List<HavannahAction?>): HavannahState {
         val agentTurn = state.agentTurn.toInt()
-        val legalActions = calculateLegalActions(state)
-        val action = requireLegalAction(actions, agentTurn, legalActions[agentTurn], state)
+        val action = requireLegalAction(actions, agentTurn, state) { isLegalAction(state, agentTurn, it) }
         val nextState = state.copy()
         nextState.locations[action.x.toInt()][action.y.toInt()] = (nextState.agentTurn + 1).toByte()
         nextState.agentTurn = nextPlayerTurnSequential(nextState.agentTurn.toInt(), NUMBER_OF_PLAYERS).toByte()
@@ -173,6 +187,40 @@ class HavannahSimulator(
     }
 
     override fun numberOfPlayers(): Int = NUMBER_OF_PLAYERS
+
+    /** True if ([x], [y]) is a cell of the hexagon, the cells [calculateLegalActions] scans. */
+    private fun isOnBoard(x: Int, y: Int, state: HavannahState): Boolean {
+        if (y !in 0 until size) {
+            return false
+        }
+        val xMin = if (y >= state.base) y - state.base + 1 else 0
+        val xMax = if (y >= state.base) size else state.base + y
+        return x in xMin until xMax
+    }
+
+    /**
+     * True if white may take black's stone under the pie rule: the rule is on, it is white's
+     * turn, and exactly one cell of the hexagon holds a stone.
+     */
+    private fun isSwapAllowed(state: HavannahState): Boolean {
+        if (!pieRule || state.agentTurn != HavannahState.TURN_WHITE) {
+            return false
+        }
+        var count = 0
+        for (y in 0 until size) {
+            val xMin = if (y >= state.base) y - state.base + 1 else 0
+            val xMax = if (y >= state.base) size else state.base + y
+            for (x in xMin until xMax) {
+                if (!state.isLocationEmpty(x, y)) {
+                    count += 1
+                    if (count > 1) {
+                        return false
+                    }
+                }
+            }
+        }
+        return count == 1
+    }
 
     companion object {
         private const val MIN_BASE = 2
