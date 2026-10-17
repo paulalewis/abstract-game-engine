@@ -21,7 +21,7 @@ Domain-specific state:
 
 - Draughts tracks an unfinished multi-jump (`mustContinueFromX`, pending captures) in the state. For the draw rules it also keeps the positions since the last man move or capture, a king-move counter, and the endgame material group with its move counter; these update only when a turn ends.
 - Go keeps the board colorings seen so far in the state for superko, and a pass counter.
-- Chess keeps castling rights, en-passant file, and the halfmove clock in the state.
+- Chess keeps castling rights, en-passant file, the halfmove clock, and the position keys seen since the last pawn move or capture (for threefold repetition) in the state.
 - Connect 4 and Hex use bit operations for win checks.
 
 ## Build

@@ -12,7 +12,8 @@ import com.castlefrog.agl.State
  * [enPassantX] is the file of a possible en-passant capture target (-1 if none); the target
  * rank is implied by [agentTurn].
  *
- * [halfmoveClock] implements the fifty-move rule (see property docs).
+ * [halfmoveClock] implements the fifty-move rule and [positionHistory] threefold
+ * repetition (see property docs).
  */
 class ChessState(
     val board: Array<ByteArray> = initialBoard(),
@@ -29,7 +30,23 @@ class ChessState(
      *
      * Same meaning as the halfmove clock in FEN / the fifty-move rule in the Laws of Chess.
      */
-    var halfmoveClock: Int = 0
+    var halfmoveClock: Int = 0,
+    /**
+     * Position keys of the earlier positions since the last pawn move or capture,
+     * oldest first. The current position is not included.
+     *
+     * [ChessSimulator] appends the key of the position being left on every move, and
+     * clears the list when [halfmoveClock] resets to 0, since a pawn move or capture
+     * makes those positions unreachable. Its size therefore matches [halfmoveClock]
+     * for states reached by play, and the fifty-move rule caps it at 100 entries.
+     * When the current position's key already occurs twice, the position has occurred
+     * three times and [ChessSimulator] treats it as a draw.
+     *
+     * A key covers the pieces on each square, the side to move, castling rights, and
+     * the en passant file only when a legal en passant capture exists (Laws of Chess,
+     * article 9.2). See [ChessSimulator.positionKey].
+     */
+    val positionHistory: MutableList<String> = ArrayList()
 ) : State<ChessState> {
 
     companion object {
@@ -63,7 +80,14 @@ class ChessState(
 
     override fun copy(): ChessState {
         val copyBoard = Array(SIZE) { board[it].copyOf() }
-        return ChessState(copyBoard, agentTurn, castlingRights, enPassantX, halfmoveClock)
+        return ChessState(
+            copyBoard,
+            agentTurn,
+            castlingRights,
+            enPassantX,
+            halfmoveClock,
+            ArrayList(positionHistory)
+        )
     }
 
     fun isOnBoard(x: Int, y: Int): Boolean = x in 0 until SIZE && y in 0 until SIZE
@@ -83,6 +107,7 @@ class ChessState(
         if (other !is ChessState) return false
         if (agentTurn != other.agentTurn || castlingRights != other.castlingRights) return false
         if (enPassantX != other.enPassantX || halfmoveClock != other.halfmoveClock) return false
+        if (positionHistory != other.positionHistory) return false
         for (i in 0 until SIZE) {
             if (!board[i].contentEquals(other.board[i])) return false
         }
@@ -94,6 +119,7 @@ class ChessState(
         result = 31 * result + castlingRights
         result = 31 * result + enPassantX
         result = 31 * result + halfmoveClock
+        result = 31 * result + positionHistory.hashCode()
         for (i in 0 until SIZE) {
             result = 31 * result + board[i].contentHashCode()
         }

@@ -8,7 +8,13 @@ import kotlin.math.abs
 
 /**
  * Standard chess with castling, en passant, promotion, check, checkmate, and stalemate.
- * Draws by stalemate or the 50-move rule yield neutral rewards.
+ * Draws by stalemate, the 50-move rule, or threefold repetition yield neutral rewards.
+ *
+ * The 50-move rule and threefold repetition are automatic: the game ends with no legal
+ * actions as soon as [ChessState.halfmoveClock] reaches 100 or the current position has
+ * occurred for the third time (see [ChessState.positionHistory]). Under the Laws of Chess
+ * both are draws a player must claim, but a simulator has no way to claim. Checkmate and
+ * stalemate are checked first, so a mating move wins even if it also completes a repetition.
  *
  * Player 0 is white, player 1 is black.
  */
@@ -35,9 +41,7 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
                 AdversarialRewards.neutral()
             }
         }
-        if (state.halfmoveClock >= 100) {
-            return AdversarialRewards.neutral()
-        }
+        // Draws by the 50-move rule or threefold repetition, like any other non-mate, are neutral.
         return AdversarialRewards.neutral()
     }
 
@@ -48,7 +52,7 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
         if (moves.isEmpty()) {
             return legal
         }
-        if (state.halfmoveClock >= 100) {
+        if (state.halfmoveClock >= 100 || isThreefoldRepetition(state)) {
             return legal
         }
         legal[state.agentTurn.toInt()].addAll(moves)
@@ -62,12 +66,58 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
         return applyMove(state, action)
     }
 
+    /**
+     * True when the current position of [state] has occurred for at least the third time
+     * since the last pawn move or capture.
+     */
+    internal fun isThreefoldRepetition(state: ChessState): Boolean {
+        if (state.positionHistory.size < 2) return false
+        val key = positionKey(state)
+        return state.positionHistory.count { it == key } >= 2
+    }
+
+    /**
+     * Key identifying a position for repetition (Laws of Chess, article 9.2): the piece on
+     * each square, the side to move, castling rights, and the en passant file. The en passant
+     * file counts only when a legal en passant capture exists, so a two-square pawn move that
+     * no pawn can capture does not make the position differ. The halfmove clock is not part
+     * of the key.
+     */
+    internal fun positionKey(state: ChessState): String {
+        val sb = StringBuilder(ChessState.SIZE * ChessState.SIZE + 8)
+        for (x in 0 until ChessState.SIZE) {
+            for (y in 0 until ChessState.SIZE) {
+                sb.append('0' + (state.get(x, y) + ChessState.KING))
+            }
+        }
+        sb.append('/').append(state.agentTurn.toInt())
+        sb.append('/').append(state.castlingRights)
+        sb.append('/').append(if (hasLegalEnPassant(state)) state.enPassantX else -1)
+        return sb.toString()
+    }
+
+    private fun hasLegalEnPassant(state: ChessState): Boolean {
+        val epX = state.enPassantX
+        if (epX < 0) return false
+        val turn = state.agentTurn.toInt()
+        val pawn = if (turn == 0) ChessState.PAWN.toByte() else (-ChessState.PAWN).toByte()
+        val fromY = if (turn == 0) 4 else 3
+        val toY = if (turn == 0) 5 else 2
+        for (dx in intArrayOf(-1, 1)) {
+            val fromX = epX + dx
+            if (!state.isOnBoard(fromX, fromY) || state.get(fromX, fromY) != pawn) continue
+            if (state.get(epX, toY) != ChessState.EMPTY) continue
+            if (!isInCheck(movePieces(state, ChessAction(fromX, fromY, epX, toY)), turn)) return true
+        }
+        return false
+    }
+
     private fun generateLegalActions(state: ChessState): Set<ChessAction> {
         val turn = state.agentTurn.toInt()
         val pseudo = generatePseudoLegal(state, turn)
         val legal = mutableSetOf<ChessAction>()
         for (move in pseudo) {
-            val next = applyMove(state, move)
+            val next = movePieces(state, move)
             if (!isInCheck(next, turn)) {
                 legal.add(move)
             }
@@ -236,7 +286,24 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
         }
     }
 
+    /**
+     * Plays [action] on a copy of [state], including the repetition bookkeeping in
+     * [ChessState.positionHistory].
+     */
     internal fun applyMove(state: ChessState, action: ChessAction): ChessState {
+        val next = movePieces(state, action)
+        if (next.halfmoveClock != 0) {
+            next.positionHistory.add(positionKey(state))
+        }
+        return next
+    }
+
+    /**
+     * Plays [action] on a copy of [state] without the repetition bookkeeping, which is all
+     * that legality checks need. The pawn move or capture case still clears
+     * [ChessState.positionHistory], since those positions can no longer recur.
+     */
+    private fun movePieces(state: ChessState, action: ChessAction): ChessState {
         val next = state.copy()
         val turn = next.agentTurn.toInt()
         val piece = next.get(action.fromX, action.fromY)
@@ -294,10 +361,11 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
             -1
         }
 
-        next.halfmoveClock = if (ChessState.type(piece) == ChessState.PAWN || captured != ChessState.EMPTY) {
-            0
+        if (ChessState.type(piece) == ChessState.PAWN || captured != ChessState.EMPTY) {
+            next.halfmoveClock = 0
+            next.positionHistory.clear()
         } else {
-            next.halfmoveClock + 1
+            next.halfmoveClock += 1
         }
 
         next.agentTurn = nextPlayerTurnSequential(turn, NUMBER_OF_PLAYERS).toByte()

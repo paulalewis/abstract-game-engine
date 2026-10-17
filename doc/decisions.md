@@ -50,8 +50,8 @@ A ring may enclose empty cells, the opponent's stones, or the player's own stone
 
 ## Draws are automatic
 
-Chess's fifty-move rule and the draughts draw rules end the game as soon as the condition holds, with neutral rewards and no legal actions. Over the board a player must claim these draws; here no player can claim, and agents doing random playouts would otherwise never finish drawn endgames such as king against king. A player with no legal move still loses on the same turn.
+Chess's fifty-move rule and threefold repetition, and the draughts draw rules, end the game as soon as the condition holds, with neutral rewards and no legal actions. Over the board a player must claim these draws; here no player can claim, and agents doing random playouts would otherwise never finish drawn endgames such as king against king. A player with no legal move still loses on the same turn, and a chess mate still wins even if it also completes a repetition.
 
 ## Draw history lives in the state
 
-Draughts repetition needs earlier positions. They are kept in `DraughtsState`, reset by any man move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."
+Draughts and chess repetition need earlier positions. They are kept in `DraughtsState` and `ChessState`, reset by any man or pawn move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."
