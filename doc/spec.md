@@ -33,7 +33,7 @@ All domains are two-player and zero-sum. Player 0 moves first.
 | Connect 4 | 7 wide, 6 high. Four in a row in any direction wins. | none |
 | Draughts | International draughts on 10×10. Captures are mandatory and the longest sequence must be taken; kings fly. A multi-jump is several actions by the same player. A player with no moves loses. | none |
 | Go | Tromp–Taylor rules: positional superko, suicide allowed if the position is new, two passes end the game, area scoring. Player 0 is black. | board size, komi (default 19 and 7) |
-| Havannah | Hexagonal board. Win by a ring, a bridge (two corners), or a fork (three sides). | base, pie rule (default 10 and on) |
+| Havannah | Hexagonal board. Win by a ring (a loop of stones around one or more cells, whatever they hold, including the player's own stones), a bridge (two corners), or a fork (three sides). Only the player who just moved is checked for a ring. | base, pie rule (default 10 and on) |
 | Hex | Rhombus board. Player 0 connects one pair of sides, player 1 the other. | board size, pie rule (default 11 and on) |
 
 Not implemented: chess draws by threefold repetition or insufficient material.

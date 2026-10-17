@@ -197,4 +197,115 @@ class HavannahSimulatorTest {
         assertTrue(simulator.isTerminalState(sideState))
         assertTrue(simulator.calculateLegalActions(sideState).all { it.isEmpty() })
     }
+
+    @Test
+    fun blackWinsRingAroundEmptyCell() {
+        assertBlackRingAroundCenter(centerOwner = null)
+    }
+
+    @Test
+    fun blackWinsRingAroundWhiteStone() {
+        assertBlackRingAroundCenter(centerOwner = HavannahState.TURN_WHITE)
+    }
+
+    @Test
+    fun blackWinsRingAroundOwnStone() {
+        assertBlackRingAroundCenter(centerOwner = HavannahState.TURN_BLACK)
+    }
+
+    @Test
+    fun blackWinsRingAroundMixedArea() {
+        // Black rings (7, 7) black, (8, 7) white and (8, 8) empty.
+        val ring = listOf(
+            HavannahAction(6, 6), HavannahAction(6, 7), HavannahAction(7, 6), HavannahAction(7, 8),
+            HavannahAction(8, 6), HavannahAction(9, 7), HavannahAction(9, 8), HavannahAction(8, 9),
+            HavannahAction(9, 9)
+        )
+        val blackMoves = listOf(HavannahAction(7, 7)) + ring
+        val whiteMoves = listOf(HavannahAction(8, 7)) + farWhiteMoves(6) +
+            listOf(HavannahAction(1, 1), HavannahAction(1, 2))
+        assertBlackWinsOnLastMove(blackMoves, whiteMoves)
+    }
+
+    @Test
+    fun blackWinsRingAroundTwoOwnStones() {
+        val locations = Array(15) { ByteArray(15) }
+        val cells = listOf(
+            7 to 7, 8 to 7,
+            6 to 6, 6 to 7, 7 to 6, 7 to 8, 8 to 6, 8 to 8, 9 to 7, 9 to 8
+        )
+        for ((x, y) in cells) {
+            locations[x][y] = HavannahState.LOCATION_BLACK
+        }
+        val state = HavannahState(8, locations, HavannahState.TURN_WHITE)
+        val simulator = HavannahSimulator(base = 8, pieRule = false)
+        assertArrayEquals(intArrayOf(1, -1), simulator.calculateRewards(state))
+    }
+
+    @Test
+    fun ownStoneRingOnlyCountsForPlayerWhoJustMoved() {
+        val locations = Array(15) { ByteArray(15) }
+        val cells = listOf(7 to 7, 6 to 6, 6 to 7, 7 to 6, 7 to 8, 8 to 7, 8 to 8)
+        for ((x, y) in cells) {
+            locations[x][y] = HavannahState.LOCATION_WHITE
+        }
+        val simulator = HavannahSimulator(base = 8, pieRule = false)
+        assertArrayEquals(
+            intArrayOf(-1, 1),
+            simulator.calculateRewards(HavannahState(8, locations, HavannahState.TURN_BLACK))
+        )
+        assertArrayEquals(
+            intArrayOf(0, 0),
+            simulator.calculateRewards(HavannahState(8, locations, HavannahState.TURN_WHITE))
+        )
+    }
+
+    @Test
+    fun cornerStoneWithAllNeighboursOwnIsNotRing() {
+        val locations = Array(15) { ByteArray(15) }
+        val cells = listOf(0 to 0, 1 to 0, 0 to 1, 1 to 1)
+        for ((x, y) in cells) {
+            locations[x][y] = HavannahState.LOCATION_BLACK
+        }
+        val state = HavannahState(8, locations, HavannahState.TURN_WHITE)
+        val simulator = HavannahSimulator(base = 8, pieRule = false)
+        assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
+    }
+
+    /**
+     * Base 8, pie rule off. Black rings (7, 7) with six stones while white plays along the x = 0
+     * edge. [centerOwner] is who takes (7, 7) first, or null to leave it empty.
+     */
+    private fun assertBlackRingAroundCenter(centerOwner: Byte?) {
+        val ring = listOf(
+            HavannahAction(6, 6), HavannahAction(6, 7), HavannahAction(7, 6),
+            HavannahAction(7, 8), HavannahAction(8, 7), HavannahAction(8, 8)
+        )
+        val center = HavannahAction(7, 7)
+        val (blackMoves, whiteMoves) = when (centerOwner) {
+            HavannahState.TURN_BLACK -> (listOf(center) + ring) to farWhiteMoves(6)
+            HavannahState.TURN_WHITE -> ring to (listOf(center) + farWhiteMoves(4))
+            else -> ring to farWhiteMoves(5)
+        }
+        assertBlackWinsOnLastMove(blackMoves, whiteMoves)
+    }
+
+    /** White stones along the x = 0 edge, away from both corners. */
+    private fun farWhiteMoves(n: Int): List<HavannahAction> = (1..n).map { HavannahAction(0, it.toByte()) }
+
+    /** Alternates [blackMoves] and [whiteMoves] from the start; only black's last move wins. */
+    private fun assertBlackWinsOnLastMove(blackMoves: List<HavannahAction>, whiteMoves: List<HavannahAction>) {
+        assertEquals(blackMoves.size - 1, whiteMoves.size)
+        val simulator = HavannahSimulator(base = 8, pieRule = false)
+        var state = simulator.initialState
+        for (i in blackMoves.indices) {
+            assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
+            state = simulator.stateTransition(state, listOf(blackMoves[i], null))
+            if (i < whiteMoves.size) {
+                assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
+                state = simulator.stateTransition(state, listOf(null, whiteMoves[i]))
+            }
+        }
+        assertArrayEquals(intArrayOf(1, -1), simulator.calculateRewards(state))
+    }
 }
