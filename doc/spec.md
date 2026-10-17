@@ -21,6 +21,7 @@ The engine is a Kotlin library. It defines game domains (simulators) and agents 
 - `Agent` — picks an action for a player from a state, or `null` if it has none.
 - `History<A>` — records the actions taken at each step, root first. It stores actions, not states.
 - `LegalActions` helpers (`playerHasLegalActions`, `getPlayerActions`) in `util`.
+- `GoSimulator.score(state)` — the Go area score as a `GoScore`: stones and territory for each side, and komi. Territory is empty points whose region reaches only that color; a region reaching both counts for neither. It works for any state, finished or not. `calculateRewards` decides the winner from these totals, so the two always agree, ties included.
 - `AdversarialRewards` — two-player rewards: `[1, -1]` first player wins, `[-1, 1]` second player wins, `[0, 0]` otherwise.
 
 A state is terminal when no player has a legal action.
