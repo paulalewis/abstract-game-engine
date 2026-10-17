@@ -59,10 +59,28 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
         return legal
     }
 
+    /**
+     * Checks [action] without generating every legal move: the draw counters, then the moving
+     * piece's own pseudo-legal moves, then whether the move leaves the mover's king in check.
+     * A move that passes means the side to move has a legal move, so it is not checkmated or
+     * stalemated.
+     */
+    override fun isLegalAction(state: ChessState, agentTurn: Int, action: ChessAction): Boolean {
+        val turn = state.agentTurn.toInt()
+        if (agentTurn != turn) return false
+        if (state.halfmoveClock >= 100) return false
+        if (!state.isOnBoard(action.fromX, action.fromY)) return false
+        if (!state.pieceBelongsToSide(state.get(action.fromX, action.fromY), turn)) return false
+        val moves = ArrayList<ChessAction>()
+        addPieceMoves(state, action.fromX, action.fromY, turn, moves)
+        if (action !in moves) return false
+        if (isInCheck(movePieces(state, action), turn)) return false
+        return !isThreefoldRepetition(state)
+    }
+
     override fun stateTransition(state: ChessState, actions: List<ChessAction?>): ChessState {
         val agentTurn = state.agentTurn.toInt()
-        val legalActions = calculateLegalActions(state)
-        val action = requireLegalAction(actions, agentTurn, legalActions[agentTurn], state)
+        val action = requireLegalAction(actions, agentTurn, state) { isLegalAction(state, agentTurn, it) }
         return applyMove(state, action)
     }
 
@@ -131,17 +149,28 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
             for (y in 0 until ChessState.SIZE) {
                 val p = state.get(x, y)
                 if (!state.pieceBelongsToSide(p, turn)) continue
-                when (ChessState.type(p)) {
-                    ChessState.PAWN -> addPawnMoves(state, x, y, turn, moves)
-                    ChessState.KNIGHT -> addKnightMoves(state, x, y, turn, moves)
-                    ChessState.BISHOP -> addSliding(state, x, y, turn, BISHOP_DIRS, moves)
-                    ChessState.ROOK -> addSliding(state, x, y, turn, ROOK_DIRS, moves)
-                    ChessState.QUEEN -> addSliding(state, x, y, turn, QUEEN_DIRS, moves)
-                    ChessState.KING -> addKingMoves(state, x, y, turn, moves)
-                }
+                addPieceMoves(state, x, y, turn, moves)
             }
         }
         return moves
+    }
+
+    /** Adds the pseudo-legal moves of [turn]'s piece on (x, y). */
+    private fun addPieceMoves(
+        state: ChessState,
+        x: Int,
+        y: Int,
+        turn: Int,
+        moves: MutableList<ChessAction>
+    ) {
+        when (ChessState.type(state.get(x, y))) {
+            ChessState.PAWN -> addPawnMoves(state, x, y, turn, moves)
+            ChessState.KNIGHT -> addKnightMoves(state, x, y, turn, moves)
+            ChessState.BISHOP -> addSliding(state, x, y, turn, BISHOP_DIRS, moves)
+            ChessState.ROOK -> addSliding(state, x, y, turn, ROOK_DIRS, moves)
+            ChessState.QUEEN -> addSliding(state, x, y, turn, QUEEN_DIRS, moves)
+            ChessState.KING -> addKingMoves(state, x, y, turn, moves)
+        }
     }
 
     private fun addPawnMoves(

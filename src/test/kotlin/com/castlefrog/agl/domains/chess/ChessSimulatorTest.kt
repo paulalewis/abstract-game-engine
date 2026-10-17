@@ -411,4 +411,177 @@ class ChessSimulatorTest {
         assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
         assertFalse(simulator.isInCheck(state))
     }
+
+    /** [action] is illegal by every route: legal actions, [ChessSimulator.isLegalAction], and stateTransition. */
+    private fun assertIllegal(simulator: ChessSimulator, state: ChessState, action: ChessAction) {
+        for (player in 0 until 2) {
+            assertFalse(simulator.calculateLegalActions(state)[player].contains(action))
+            assertFalse(simulator.isLegalAction(state, player, action))
+        }
+        val actions = if (state.agentTurn == ChessState.TURN_WHITE) listOf(action, null) else listOf(null, action)
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, actions)
+        }
+    }
+
+    private fun assertLegal(simulator: ChessSimulator, state: ChessState, action: ChessAction) {
+        val turn = state.agentTurn.toInt()
+        assertTrue(simulator.calculateLegalActions(state)[turn].contains(action))
+        assertTrue(simulator.isLegalAction(state, turn, action))
+        assertFalse(simulator.isLegalAction(state, 1 - turn, action))
+    }
+
+    @Test
+    fun movingOpponentsPieceIsIllegal() {
+        val simulator = ChessSimulator()
+        // White to move; e7-e5 is black's move.
+        assertIllegal(simulator, simulator.initialState, ChessAction(4, 6, 4, 4))
+    }
+
+    @Test
+    fun movingFromEmptySquareIsIllegal() {
+        val simulator = ChessSimulator()
+        assertIllegal(simulator, simulator.initialState, ChessAction(4, 2, 4, 3)) // e3-e4
+    }
+
+    @Test
+    fun moveOffTheBoardIsIllegal() {
+        val simulator = ChessSimulator()
+        assertIllegal(simulator, simulator.initialState, ChessAction(-1, 0, 0, 2))
+        assertIllegal(simulator, simulator.initialState, ChessAction(8, 1, 7, 2))
+        assertIllegal(simulator, simulator.initialState, ChessAction(0, 1, 0, -1))
+        assertIllegal(simulator, simulator.initialState, ChessAction(7, 1, 8, 2))
+    }
+
+    @Test
+    fun movingPinnedPieceIsIllegal() {
+        val simulator = ChessSimulator()
+        // White king e1, white bishop e2 pinned by black rook e8, black king a8.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(4, 0, ChessState.KING.toByte())
+        state.set(4, 1, ChessState.BISHOP.toByte())
+        state.set(4, 7, (-ChessState.ROOK).toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        assertIllegal(simulator, state, ChessAction(4, 1, 3, 2)) // Be2-d3
+        assertLegal(simulator, state, ChessAction(4, 0, 3, 0)) // Ke1-d1
+    }
+
+    @Test
+    fun castlingThroughOrOutOfCheckIsIllegal() {
+        val simulator = ChessSimulator()
+        // White king e1, rooks a1 and h1, black king a8; white may castle either side.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(4, 0, ChessState.KING.toByte())
+        state.set(0, 0, ChessState.ROOK.toByte())
+        state.set(7, 0, ChessState.ROOK.toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        state.castlingRights = 0b0011
+        val kingSide = ChessAction(4, 0, 6, 0)
+        val queenSide = ChessAction(4, 0, 2, 0)
+        assertLegal(simulator, state, kingSide)
+        assertLegal(simulator, state, queenSide)
+
+        // Black rook f8 attacks f1: king side passes through check, queen side is fine.
+        val throughCheck = state.copy()
+        throughCheck.set(5, 7, (-ChessState.ROOK).toByte())
+        assertIllegal(simulator, throughCheck, kingSide)
+        assertLegal(simulator, throughCheck, queenSide)
+
+        // Black rook e8 gives check: neither side may castle.
+        val outOfCheck = state.copy()
+        outOfCheck.set(4, 7, (-ChessState.ROOK).toByte())
+        assertIllegal(simulator, outOfCheck, kingSide)
+        assertIllegal(simulator, outOfCheck, queenSide)
+
+        // Without the right, castling is illegal even when nothing attacks.
+        val noRights = state.copy()
+        noRights.castlingRights = 0b0010
+        assertIllegal(simulator, noRights, kingSide)
+        assertLegal(simulator, noRights, queenSide)
+    }
+
+    @Test
+    fun enPassantIsIllegalWhenNotAvailable() {
+        val simulator = ChessSimulator()
+        // White pawn e5, black pawn d5, kings e1 and e8; white to move.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(4, 4, ChessState.PAWN.toByte())
+        state.set(3, 4, (-ChessState.PAWN).toByte())
+        state.set(4, 0, ChessState.KING.toByte())
+        state.set(4, 7, (-ChessState.KING).toByte())
+        val enPassant = ChessAction(4, 4, 3, 5) // e5xd6 e.p.
+        state.enPassantX = -1
+        assertIllegal(simulator, state, enPassant)
+        state.enPassantX = 2 // the c-file, not the d-pawn
+        assertIllegal(simulator, state, enPassant)
+        state.enPassantX = 3
+        assertLegal(simulator, state, enPassant)
+    }
+
+    @Test
+    fun promotionMustChooseAPieceOnlyOnTheLastRank() {
+        val simulator = ChessSimulator()
+        // White pawns a7 and h2, kings e1 and e8; white to move.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(0, 6, ChessState.PAWN.toByte())
+        state.set(7, 1, ChessState.PAWN.toByte())
+        state.set(4, 0, ChessState.KING.toByte())
+        state.set(4, 7, (-ChessState.KING).toByte())
+        assertIllegal(simulator, state, ChessAction(0, 6, 0, 7)) // a8 with no piece chosen
+        assertIllegal(simulator, state, ChessAction(0, 6, 0, 7, -ChessState.QUEEN)) // black's queen
+        assertIllegal(simulator, state, ChessAction(0, 6, 0, 7, ChessState.KING))
+        assertIllegal(simulator, state, ChessAction(7, 1, 7, 2, ChessState.QUEEN)) // h3 is not the last rank
+        assertLegal(simulator, state, ChessAction(0, 6, 0, 7, ChessState.QUEEN))
+        assertLegal(simulator, state, ChessAction(0, 6, 0, 7, ChessState.KNIGHT))
+        assertLegal(simulator, state, ChessAction(7, 1, 7, 2))
+    }
+
+    @Test
+    fun noMoveIsLegalAfterCheckmate() {
+        val simulator = ChessSimulator()
+        // KR vs K: white king a6, white rook h7, black king a8. Rh7-h8#.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(0, 5, ChessState.KING.toByte())
+        state.set(7, 6, ChessState.ROOK.toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        val mated = play(simulator, state, ChessAction(7, 6, 7, 7))
+        assertIllegal(simulator, mated, ChessAction(0, 7, 1, 6)) // Ka8-b7
+        assertIllegal(simulator, mated, ChessAction(0, 7, 1, 7)) // Ka8-b8
+    }
+
+    @Test
+    fun noMoveIsLegalInStalemate() {
+        val simulator = ChessSimulator()
+        // Black king a8, white queen b6, white king c1; black to move and has no moves.
+        val state = emptyBoard(ChessState.TURN_BLACK)
+        state.set(0, 7, (-ChessState.KING).toByte())
+        state.set(1, 5, ChessState.QUEEN.toByte())
+        state.set(2, 0, ChessState.KING.toByte())
+        assertIllegal(simulator, state, ChessAction(0, 7, 1, 7)) // Ka8-b8
+        assertIllegal(simulator, state, ChessAction(0, 7, 0, 6)) // Ka8-a7
+    }
+
+    @Test
+    fun noMoveIsLegalAfterFiftyMoveDraw() {
+        val simulator = ChessSimulator()
+        // KR vs K with the clock at 100: Rh7-h1 would otherwise be legal.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(0, 5, ChessState.KING.toByte())
+        state.set(7, 6, ChessState.ROOK.toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        state.halfmoveClock = 99
+        assertLegal(simulator, state, ChessAction(7, 6, 7, 0))
+        state.halfmoveClock = 100
+        assertIllegal(simulator, state, ChessAction(7, 6, 7, 0))
+    }
+
+    @Test
+    fun noMoveIsLegalAfterThreefoldRepetition() {
+        val simulator = ChessSimulator()
+        val cycle = arrayOf(whiteKnightOut, blackKnightOut, whiteKnightBack, blackKnightBack)
+        val state = play(simulator, simulator.initialState, *cycle, *cycle)
+        assertTrue(simulator.isThreefoldRepetition(state))
+        assertIllegal(simulator, state, whiteKnightOut)
+        assertIllegal(simulator, state, ChessAction(4, 1, 4, 3)) // e2-e4
+    }
 }
