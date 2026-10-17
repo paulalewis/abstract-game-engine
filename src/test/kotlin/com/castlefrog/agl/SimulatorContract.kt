@@ -1,9 +1,11 @@
 package com.castlefrog.agl
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
+import kotlin.random.Random
 
 /**
  * Shared contract checks for [Simulator] / [State] across domains.
@@ -11,6 +13,7 @@ import org.junit.Assert.assertTrue
  * Asserts the library-wide rules:
  * - [Simulator.stateTransition] never mutates its input
  * - [State.copy] is a deep copy sufficient for isolation
+ * - [Simulator.isLegalAction] agrees with [Simulator.calculateLegalActions]
  */
 object SimulatorContract {
 
@@ -86,7 +89,59 @@ object SimulatorContract {
     }
 
     /**
-     * Runs both transition non-mutation and deep-copy isolation for a domain fixture.
+     * [Simulator.isLegalAction] must agree with [Simulator.calculateLegalActions] on the
+     * states of [playouts] random playouts from [Simulator.initialState]: every legal
+     * action passes, and a sample of illegal actions fails. Illegal candidates are
+     * actions legal for some player somewhere in the playouts but not for this player
+     * in this state (occupied points, moves out of turn, moves after the game ends).
+     */
+    fun <S : State<S>, A : Action> assertIsLegalActionAgreesWithLegalActions(
+        simulator: Simulator<S, A>,
+        random: Random = Random(0),
+        playouts: Int = 3,
+        maxSteps: Int = 80,
+        illegalSamplesPerPlayer: Int = 10
+    ) {
+        val states = ArrayList<S>()
+        val seenActions = LinkedHashSet<A>()
+        repeat(playouts) {
+            var state = simulator.initialState
+            for (step in 0..maxSteps) {
+                states.add(state)
+                val legalActions = simulator.calculateLegalActions(state)
+                legalActions.forEach { seenActions.addAll(it) }
+                val playerId = legalActions.indices.firstOrNull { legalActions[it].isNotEmpty() } ?: break
+                val action = legalActions[playerId].random(random)
+                state = simulator.stateTransition(
+                    state,
+                    List(simulator.numberOfPlayers()) { if (it == playerId) action else null }
+                )
+            }
+        }
+        for (state in states) {
+            val legalActions = simulator.calculateLegalActions(state)
+            for (playerId in 0 until simulator.numberOfPlayers()) {
+                val legal = legalActions[playerId]
+                for (action in legal) {
+                    assertTrue(
+                        "isLegalAction must accept legal action $action for player $playerId from state $state",
+                        simulator.isLegalAction(state, playerId, action)
+                    )
+                }
+                val illegal = seenActions.filter { it !in legal }.shuffled(random).take(illegalSamplesPerPlayer)
+                for (action in illegal) {
+                    assertFalse(
+                        "isLegalAction must reject illegal action $action for player $playerId from state $state",
+                        simulator.isLegalAction(state, playerId, action)
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs transition non-mutation, deep-copy isolation, and [Simulator.isLegalAction]
+     * agreement for a domain fixture.
      */
     fun <S : State<S>, A : Action> assertDomainContracts(
         simulator: Simulator<S, A>,
@@ -99,5 +154,6 @@ object SimulatorContract {
         )
         assertStateTransitionDoesNotMutateInput(simulator, state)
         assertCopyIsDeep(state, mutateNested)
+        assertIsLegalActionAgreesWithLegalActions(simulator)
     }
 }

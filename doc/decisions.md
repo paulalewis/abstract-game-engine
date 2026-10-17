@@ -28,6 +28,10 @@ Earlier simulators cached legal actions, column heights, or the previous action 
 
 `stateTransition` takes `List<A?>` and legal actions are `List<Set<A>>`, even though every current domain is turn-based. One interface covers any number of players and simultaneous moves. `requireLegalAction` checks the entry for the player to move.
 
+## stateTransition validates only the action given
+
+Apps rebuild a position by replaying its history through `stateTransition`. Validating by generating every legal action made replay cost grow with the number of legal moves: in Go, a trial board and a superko scan per empty point, 98% of a 300-move 19×19 replay. Validating one action with `isLegalAction` is a single trial board. Do not go back to `calculateLegalActions` inside `stateTransition` for a domain that overrides `isLegalAction`. An override must agree with `calculateLegalActions`; `SimulatorContract` checks this for every domain. Draughts keeps the default because the majority-capture rule needs every capture found anyway.
+
 ## Core does not depend on domains
 
 `AdversarialRewards` and turn helpers live in `domains`, not core, so the core interfaces do not assume two-player zero-sum games.

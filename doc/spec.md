@@ -14,6 +14,8 @@ The engine is a Kotlin library. It defines game domains (simulators) and agents 
 ## Public API
 
 - `Simulator<S, A>` — rules of one domain. Actions are passed as a list with one entry per player; `null` means that player takes no action. Legal actions come back the same way, one set per player.
+- `Simulator.isLegalAction(state, agentTurn, action)` — whether one action is legal for a player. It always agrees with `calculateLegalActions`. Go checks the action alone; other domains generate every legal action and look it up.
+- `requireLegalAction` — the check simulators run in `stateTransition`. It takes either the player's set of legal actions or a predicate such as `isLegalAction`, and throws `IllegalActionException` with the same messages either way.
 - `State<S>` — a domain state with a deep `copy()`.
 - `Action` — marker for a domain move. Actions are immutable and compare by value.
 - `Agent` — picks an action for a player from a state, or `null` if it has none.

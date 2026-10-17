@@ -24,6 +24,19 @@ interface Simulator<S : State<S>, A : Action> {
     fun calculateLegalActions(state: S): List<Set<A>>
 
     /**
+     * Whether [action] is legal for [agentTurn] in [state]. Must agree with
+     * [calculateLegalActions]. The default generates every legal action; override
+     * when one action can be checked without doing so.
+     *
+     * @param state the state to check the action from
+     * @param agentTurn the player taking [action]
+     * @param action the action to check
+     * @return true if [action] is in `calculateLegalActions(state)[agentTurn]`
+     */
+    fun isLegalAction(state: S, agentTurn: Int, action: A): Boolean =
+        action in calculateLegalActions(state)[agentTurn]
+
+    /**
      * Transition from the current state to the next state
      * given a set of player actions.
      *
@@ -70,6 +83,21 @@ fun <A : Action> requireLegalAction(
     agentTurn: Int,
     legalForPlayer: Set<A>,
     state: Any
+): A = requireLegalAction(actions, agentTurn, state) { it in legalForPlayer }
+
+/**
+ * Resolves the action for [agentTurn] from [actions], ensuring the list is long
+ * enough and the action is legal by [isLegal]. Use with [Simulator.isLegalAction]
+ * to check only the action given instead of every legal action.
+ *
+ * @throws IllegalActionException if the actions list is too short, the action is
+ *         null, or [isLegal] returns false for it
+ */
+fun <A : Action> requireLegalAction(
+    actions: List<A?>,
+    agentTurn: Int,
+    state: Any,
+    isLegal: (A) -> Boolean
 ): A {
     if (agentTurn !in actions.indices) {
         throw IllegalActionException(
@@ -77,7 +105,7 @@ fun <A : Action> requireLegalAction(
         )
     }
     val action = actions[agentTurn]
-    if (action === null || action !in legalForPlayer) {
+    if (action === null || !isLegal(action)) {
         throw IllegalActionException("Illegal action, $action, from state, $state")
     }
     return action

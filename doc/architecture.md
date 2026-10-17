@@ -13,7 +13,9 @@ Everything is under `src/main/kotlin/com/castlefrog/agl`.
 
 Dependencies point inward: domains and agents depend on core; core depends on nothing here.
 
-Data flow for one step: a caller asks the simulator for legal actions, an agent picks one, the caller builds a per-player actions list and calls `stateTransition`. The simulator validates with `requireLegalAction`, copies the state, applies the move to the copy, and returns it. Rewards and terminality are computed from the state alone, with no cache.
+Data flow for one step: a caller asks the simulator for legal actions, an agent picks one, the caller builds a per-player actions list and calls `stateTransition`. The simulator validates the action for the player to move with `requireLegalAction`, copies the state, applies the move to the copy, and returns it. Rewards and terminality are computed from the state alone, with no cache.
+
+`isLegalAction` defaults to generating every legal action and looking the given one up. A domain overrides it when one action can be checked more cheaply; Go does, with one trial board and one superko scan. Domains on the default still pass `calculateLegalActions` to `requireLegalAction`.
 
 Domain-specific state:
 
@@ -31,7 +33,7 @@ Gradle with the Kotlin DSL and the bundled wrapper. Kotlin version, JVM toolchai
 JUnit 4 via `kotlin-test-junit`, in `src/test/kotlin` mirroring the main packages.
 
 - Each domain has a `*SimulatorTest` for rules and a `*StateTest` for copy, equality, and formatting.
-- `SimulatorContract` holds the library-wide checks (no input mutation, deep copy). `CrossDomainSimulatorContractTest` runs them against every domain.
+- `SimulatorContract` holds the library-wide checks (no input mutation, deep copy, `isLegalAction` agreeing with `calculateLegalActions` over random playouts). `CrossDomainSimulatorContractTest` runs them against every domain.
 - `TestSimulator`, `TestState`, and `TestAction` are a minimal domain for testing core code.
 
 CI (`.github/workflows/test.yml`) runs `./gradlew test` on JDK 21 for every pull request and every push to `main`.

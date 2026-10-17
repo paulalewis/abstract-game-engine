@@ -173,4 +173,92 @@ class GoSimulatorTest {
         val legal = simulator.calculateLegalActions(simulator.initialState)[0]
         assertTrue(legal.contains(GoAction.pass()))
     }
+
+    @Test
+    fun occupiedPointIsIllegal() {
+        val simulator = GoSimulator(boardSize = 5)
+        val state = simulator.stateTransition(simulator.initialState, listOf(GoAction.place(1, 1), null))
+        assertFalse(simulator.isLegalAction(state, 1, GoAction.place(1, 1)))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(null, GoAction.place(1, 1)))
+        }
+    }
+
+    @Test
+    fun superkoRepeatIsIllegal() {
+        val simulator = GoSimulator(boardSize = 4)
+        val state = GoState(boardSize = 4)
+        //   . X O .
+        //   X O . O
+        //   . X O .
+        state.set(1, 2, GoState.LOCATION_BLACK)
+        state.set(2, 2, GoState.LOCATION_WHITE)
+        state.set(0, 1, GoState.LOCATION_BLACK)
+        state.set(1, 1, GoState.LOCATION_WHITE)
+        state.set(3, 1, GoState.LOCATION_WHITE)
+        state.set(1, 0, GoState.LOCATION_BLACK)
+        state.set(2, 0, GoState.LOCATION_WHITE)
+        state.agentTurn = GoState.TURN_BLACK
+        val afterTake = simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
+
+        assertFalse(simulator.isLegalAction(afterTake, 1, GoAction.place(1, 1)))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(afterTake, listOf(null, GoAction.place(1, 1)))
+        }
+    }
+
+    @Test
+    fun wrongPlayerIsIllegal() {
+        val simulator = GoSimulator(boardSize = 5)
+        val state = simulator.initialState
+        assertFalse(simulator.isLegalAction(state, 1, GoAction.place(2, 2)))
+        assertFalse(simulator.isLegalAction(state, 1, GoAction.pass()))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(null, GoAction.place(2, 2)))
+        }
+    }
+
+    @Test
+    fun moveAfterTwoPassesIsIllegal() {
+        val simulator = GoSimulator(boardSize = 5)
+        var state = simulator.initialState
+        state = simulator.stateTransition(state, listOf(GoAction.pass(), null))
+        state = simulator.stateTransition(state, listOf(null, GoAction.pass()))
+        assertFalse(simulator.isLegalAction(state, 0, GoAction.place(2, 2)))
+        assertFalse(simulator.isLegalAction(state, 0, GoAction.pass()))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(GoAction.place(2, 2), null))
+        }
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(GoAction.pass(), null))
+        }
+    }
+
+    @Test
+    fun offBoardPlacementIsIllegal() {
+        val simulator = GoSimulator(boardSize = 5)
+        val state = simulator.initialState
+        assertFalse(simulator.isLegalAction(state, 0, GoAction.place(5, 0)))
+        assertFalse(simulator.isLegalAction(state, 0, GoAction.place(-1, 2)))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(GoAction.place(5, 0), null))
+        }
+    }
+
+    @Test
+    fun passWithCoordinatesIsIllegalLikeCalculateLegalActions() {
+        val simulator = GoSimulator(boardSize = 5)
+        val state = simulator.initialState
+        val oddPass = GoAction(x = 2, y = 2, isPass = true)
+        assertFalse(simulator.calculateLegalActions(state)[0].contains(oddPass))
+        assertFalse(simulator.isLegalAction(state, 0, oddPass))
+    }
+
+    @Test
+    fun isLegalActionAcceptsPassAndEmptyPoint() {
+        val simulator = GoSimulator(boardSize = 5)
+        val state = simulator.initialState
+        assertTrue(simulator.isLegalAction(state, 0, GoAction.pass()))
+        assertTrue(simulator.isLegalAction(state, 0, GoAction.place(2, 2)))
+    }
 }
