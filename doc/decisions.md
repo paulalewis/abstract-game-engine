@@ -1,0 +1,41 @@
+# Decisions
+
+Why the Abstract Game Engine is this way. The behavior itself is in [spec.md](spec.md). These are the choices a later edit will be tempted to "clean up."
+
+These are current choices, not permanent ones. Any of them may be revisited. Change one deliberately, when asked, and update its entry in the same change.
+
+## One instruction file for every coding agent
+
+`AGENTS.md` is the file Grok, Codex, Cursor, and Copilot read. `CLAUDE.md` is one line, `@AGENTS.md`, so Claude Code loads the same rules. A second copy of the rules would drift. Product rules live in `doc/` so the agent file can point at them instead of becoming another spec.
+
+## History stores actions, not states
+
+History is kept concise: each step is the per-player action list, and states are rebuilt by replaying from the initial state. The shape of `History` may change.
+
+## Deterministic, perfect-information domains only, for now
+
+Chance and hidden information were dropped, along with Backgammon and Yahtzee, because they forced `History` to hold states as well as actions. They may come back. Until then, do not add random or hidden state to `Simulator` or `State`.
+
+## State transitions never mutate their input
+
+Agents doing tree search and callers keeping history hold on to earlier states, so a transition must leave its input alone and `State.copy()` must be deep. `SimulatorContract` enforces this for every domain.
+
+## No caches in simulators
+
+Earlier simulators cached legal actions, column heights, or the previous action (an LRU cache, a Connect 4 cache, the Havannah `prevActionCache`). Each cache went stale when a state was reused or reached a different way, and gave wrong wins or moves. Simulators compute everything from the state passed in.
+
+## Actions are a list with one entry per player
+
+`stateTransition` takes `List<A?>` and legal actions are `List<Set<A>>`, even though every current domain is turn-based. One interface covers any number of players and simultaneous moves. `requireLegalAction` checks the entry for the player to move.
+
+## Core does not depend on domains
+
+`AdversarialRewards` and turn helpers live in `domains`, not core, so the core interfaces do not assume two-player zero-sum games.
+
+## No third-party dependencies
+
+Arrow and Google Truth were removed. The library ships with only the Kotlin standard library, and tests use `kotlin-test-junit`.
+
+## Go uses Tromp–Taylor rules; draughts uses international rules
+
+These are the rule sets the domains implement. Tromp–Taylor scores by area, so no agreement about dead stones is needed.

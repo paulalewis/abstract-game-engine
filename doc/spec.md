@@ -1,0 +1,52 @@
+# Product spec
+
+What the Abstract Game Engine does. How it is built is in [architecture.md](architecture.md). Why it is this way is in [decisions.md](decisions.md).
+
+The engine is a Kotlin library. It defines game domains (simulators) and agents that play them. It has no UI and no executable entry point; callers drive the game loop.
+
+## Principles
+
+- Domains are deterministic and have perfect information. The same state and actions always give the same next state.
+- States are values. `Simulator.stateTransition` returns a new state and never changes the one passed in, so callers can keep old states for history and tree search.
+- Every domain answers the same questions: initial state, legal actions per player, rewards per player, next state, number of players, and whether a state is terminal.
+- An illegal transition always throws `IllegalActionException`, in every domain.
+
+## Public API
+
+- `Simulator<S, A>` — rules of one domain. Actions are passed as a list with one entry per player; `null` means that player takes no action. Legal actions come back the same way, one set per player.
+- `State<S>` — a domain state with a deep `copy()`.
+- `Action` — marker for a domain move. Actions are immutable and compare by value.
+- `Agent` — picks an action for a player from a state, or `null` if it has none.
+- `History<A>` — records the actions taken at each step, root first. It stores actions, not states.
+- `LegalActions` helpers (`playerHasLegalActions`, `getPlayerActions`) in `util`.
+- `AdversarialRewards` — two-player rewards: `[1, -1]` first player wins, `[-1, 1]` second player wins, `[0, 0]` otherwise.
+
+A state is terminal when no player has a legal action.
+
+## Domains
+
+All domains are two-player and zero-sum. Player 0 moves first.
+
+| Domain | Rules | Options |
+| --- | --- | --- |
+| Chess | Standard chess: castling, en passant, promotion, check, checkmate, stalemate. Stalemate and the fifty-move rule are draws; mate is checked first. | none |
+| Connect 4 | 7 wide, 6 high. Four in a row in any direction wins. | none |
+| Draughts | International draughts on 10×10. Captures are mandatory and the longest sequence must be taken; kings fly. A multi-jump is several actions by the same player. A player with no moves loses. | none |
+| Go | Tromp–Taylor rules: positional superko, suicide allowed if the position is new, two passes end the game, area scoring. Player 0 is black. | board size, komi (default 19 and 7) |
+| Havannah | Hexagonal board. Win by a ring, a bridge (two corners), or a fork (three sides). | base, pie rule (default 10 and on) |
+| Hex | Rhombus board. Player 0 connects one pair of sides, player 1 the other. | board size, pie rule (default 11 and on) |
+
+Not implemented: chess draws by threefold repetition or insufficient material.
+
+Domain rules and options may be revised.
+
+## Agents
+
+- `RandomAgent` — picks a legal action uniformly at random. Takes an optional `Random` for reproducible play.
+
+## Non-goals
+
+Current scope, open to change:
+
+- Games with chance (dice, shuffled cards) or hidden information, for now. Backgammon and Yahtzee were removed; see [decisions.md](decisions.md).
+- A user interface, network play, or a game-loop runner.

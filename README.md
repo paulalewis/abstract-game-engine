@@ -15,6 +15,14 @@ Domains:
 Agents:
 - random - agent randomly selects an action
 
+## Docs
+
+- [doc/spec.md](doc/spec.md) — what the library does: API, domains and their rules
+- [doc/architecture.md](doc/architecture.md) — package layout, data flow, build, tests
+- [doc/decisions.md](doc/decisions.md) — why it is built this way
+
+`AGENTS.md` is the instruction file for coding agents; `CLAUDE.md` imports it.
+
 ## Setup
 
 1. Install a JDK 21+ (for example via Homebrew: `brew install openjdk@21`)
