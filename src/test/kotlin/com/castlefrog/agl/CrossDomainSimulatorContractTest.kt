@@ -6,6 +6,7 @@ import com.castlefrog.agl.domains.connect4.Connect4Simulator
 import com.castlefrog.agl.domains.connect4.Connect4State
 import com.castlefrog.agl.domains.draughts.DraughtsSimulator
 import com.castlefrog.agl.domains.draughts.DraughtsState
+import com.castlefrog.agl.domains.go.GoRules
 import com.castlefrog.agl.domains.go.GoSimulator
 import com.castlefrog.agl.domains.go.GoState
 import com.castlefrog.agl.domains.havannah.HavannahSimulator
@@ -93,6 +94,17 @@ class CrossDomainSimulatorContractTest(
                 {
                     SimulatorContract.assertDomainContracts(
                         simulator = GoSimulator(boardSize = 5),
+                        mutateNested = { state: GoState ->
+                            state.set(0, 0, GoState.LOCATION_BLACK)
+                        }
+                    )
+                }
+            ),
+            arrayOf(
+                "Go (Chinese rules)",
+                {
+                    SimulatorContract.assertDomainContracts(
+                        simulator = GoSimulator(boardSize = 5, rules = GoRules.CHINESE),
                         mutateNested = { state: GoState ->
                             state.set(0, 0, GoState.LOCATION_BLACK)
                         }

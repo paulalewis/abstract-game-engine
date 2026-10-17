@@ -315,6 +315,128 @@ class GoSimulatorTest {
         assertScoreAgreesWithRewards(boardSize = 5, blackX = 2, whiteX = 3, komi = 0.5, expected = intArrayOf(1, -1))
     }
 
+    @Test
+    fun defaultRulesAreTrompTaylor() {
+        assertEquals(GoRules.TROMP_TAYLOR, GoSimulator().rules)
+        assertEquals(GoRules.TROMP_TAYLOR, GoSimulator(boardSize = 5, komi = 7.5).rules)
+    }
+
+    @Test
+    fun chineseRulesForbidSelfCapture() {
+        val simulator = GoSimulator(boardSize = 4, rules = GoRules.CHINESE)
+        val state = selfCaptureFixture()
+        assertFalse(simulator.calculateLegalActions(state)[0].contains(GoAction.place(2, 1)))
+        assertFalse(simulator.isLegalAction(state, 0, GoAction.place(2, 1)))
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
+        }
+    }
+
+    @Test
+    fun trompTaylorRulesAllowSelfCaptureAndRemoveTheGroup() {
+        val simulator = GoSimulator(boardSize = 4, rules = GoRules.TROMP_TAYLOR)
+        val state = selfCaptureFixture()
+        assertTrue(simulator.calculateLegalActions(state)[0].contains(GoAction.place(2, 1)))
+        assertTrue(simulator.isLegalAction(state, 0, GoAction.place(2, 1)))
+        val next = simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
+        for ((x, y) in listOf(1 to 1, 2 to 1, 1 to 2, 2 to 2)) {
+            assertEquals(GoState.LOCATION_EMPTY, next.get(x, y))
+        }
+        assertEquals(0, next.capturedByBlack)
+    }
+
+    @Test
+    fun fillingOwnLastLibertyWhileCapturingIsLegalUnderBothRules() {
+        for (rules in GoRules.entries) {
+            val simulator = GoSimulator(boardSize = 4, rules = rules)
+            // (2,0) is the black group's last liberty, and white (3,0)'s last liberty.
+            //   . . . .
+            //   . . . .
+            //   O O O X
+            //   X X . O
+            val state = GoState(boardSize = 4)
+            state.set(0, 0, GoState.LOCATION_BLACK)
+            state.set(1, 0, GoState.LOCATION_BLACK)
+            state.set(3, 0, GoState.LOCATION_WHITE)
+            state.set(0, 1, GoState.LOCATION_WHITE)
+            state.set(1, 1, GoState.LOCATION_WHITE)
+            state.set(2, 1, GoState.LOCATION_WHITE)
+            state.set(3, 1, GoState.LOCATION_BLACK)
+            state.agentTurn = GoState.TURN_BLACK
+
+            assertTrue("$rules", simulator.calculateLegalActions(state)[0].contains(GoAction.place(2, 0)))
+            assertTrue("$rules", simulator.isLegalAction(state, 0, GoAction.place(2, 0)))
+            val next = simulator.stateTransition(state, listOf(GoAction.place(2, 0), null))
+            assertEquals("$rules", GoState.LOCATION_EMPTY, next.get(3, 0))
+            for (x in 0..2) {
+                assertEquals("$rules", GoState.LOCATION_BLACK, next.get(x, 0))
+            }
+            assertEquals("$rules", 1, next.capturedByBlack)
+        }
+    }
+
+    @Test
+    fun koAndSuperkoBehaveTheSameUnderBothRules() {
+        for (rules in GoRules.entries) {
+            val simulator = GoSimulator(boardSize = 4, rules = rules)
+            //   . X O .
+            //   X O . O
+            //   . X O .
+            val state = GoState(boardSize = 4)
+            state.set(1, 2, GoState.LOCATION_BLACK)
+            state.set(2, 2, GoState.LOCATION_WHITE)
+            state.set(0, 1, GoState.LOCATION_BLACK)
+            state.set(1, 1, GoState.LOCATION_WHITE)
+            state.set(3, 1, GoState.LOCATION_WHITE)
+            state.set(1, 0, GoState.LOCATION_BLACK)
+            state.set(2, 0, GoState.LOCATION_WHITE)
+            state.agentTurn = GoState.TURN_BLACK
+
+            // Taking the ko leaves the black stone with no liberties until the capture: legal.
+            assertTrue("$rules", simulator.isLegalAction(state, 0, GoAction.place(2, 1)))
+            val afterTake = simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
+            assertEquals("$rules", GoState.LOCATION_EMPTY, afterTake.get(1, 1))
+
+            // Immediate retake repeats the earlier coloring: illegal.
+            assertFalse("$rules", simulator.calculateLegalActions(afterTake)[1].contains(GoAction.place(1, 1)))
+            assertFalse("$rules", simulator.isLegalAction(afterTake, 1, GoAction.place(1, 1)))
+            assertThrows(IllegalActionException::class.java) {
+                simulator.stateTransition(afterTake, listOf(null, GoAction.place(1, 1)))
+            }
+
+            // After a move elsewhere the position is new, so the retake is legal again.
+            var later = simulator.stateTransition(afterTake, listOf(null, GoAction.place(3, 3)))
+            later = simulator.stateTransition(later, listOf(GoAction.place(0, 3), null))
+            assertTrue("$rules", simulator.isLegalAction(later, 1, GoAction.place(1, 1)))
+        }
+    }
+
+    /**
+     * Black to play (2,1), filling its own last eye. White keeps corner liberties, so
+     * the move captures nothing and leaves the black group with no liberties.
+     *
+     *   . O O .
+     *   O X X O
+     *   O X . O
+     *   . O O .
+     */
+    private fun selfCaptureFixture(): GoState {
+        val state = GoState(boardSize = 4)
+        state.set(1, 3, GoState.LOCATION_WHITE)
+        state.set(2, 3, GoState.LOCATION_WHITE)
+        state.set(0, 2, GoState.LOCATION_WHITE)
+        state.set(1, 2, GoState.LOCATION_BLACK)
+        state.set(2, 2, GoState.LOCATION_BLACK)
+        state.set(3, 2, GoState.LOCATION_WHITE)
+        state.set(0, 1, GoState.LOCATION_WHITE)
+        state.set(1, 1, GoState.LOCATION_BLACK)
+        state.set(3, 1, GoState.LOCATION_WHITE)
+        state.set(1, 0, GoState.LOCATION_WHITE)
+        state.set(2, 0, GoState.LOCATION_WHITE)
+        state.agentTurn = GoState.TURN_BLACK
+        return state
+    }
+
     /** Plays a full column for each side, black first, then two passes. */
     private fun assertScoreAgreesWithRewards(
         boardSize: Int,
