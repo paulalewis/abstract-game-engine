@@ -266,6 +266,234 @@ class DraughtsSimulatorTest {
         }
     }
 
+    // Draw rules. The white king T walks the triangle (2,2) -> (4,4) -> (3,3) -> (2,2)
+    // while the black king shuffles (9,1) <-> (8,2). Neither can capture, and the
+    // two cycles only repeat a position (with the same player to move) after 12 plies.
+
+    @Test
+    fun threefoldRepetitionDrawsOnThirdOccurrence() {
+        val simulator = DraughtsSimulator()
+        var state = kingsWithMen()
+        // (2,2) <-> (3,3) and (9,1) <-> (8,2) return to the start every 4 plies.
+        val cycle = listOf(
+            DraughtsAction(2, 2, 3, 3),
+            DraughtsAction(9, 1, 8, 2),
+            DraughtsAction(3, 3, 2, 2),
+            DraughtsAction(8, 2, 9, 1)
+        )
+        state = play(simulator, state, cycle)
+        assertFalse("second occurrence is not a draw", isOver(simulator, state))
+        state = play(simulator, state, cycle.dropLast(1))
+        assertFalse(isOver(simulator, state))
+        state = play(simulator, state, cycle.takeLast(1))
+        assertTrue("third occurrence is a draw", isOver(simulator, state))
+        assertNeutral(simulator.calculateRewards(state))
+    }
+
+    @Test
+    fun repetitionNeedsTheSamePlayerToMove() {
+        val simulator = DraughtsSimulator()
+        val start = kingsWithMen()
+        // The board of the start position occurs again after 5 plies with black to move,
+        // then after 12 plies with white to move: three times, but only twice with white to move.
+        var state = start
+        for (ply in 0 until 12) {
+            state = play(simulator, state, listOf(triangleAction(state, ply)))
+            if (ply == 4) {
+                assertTrue(state.board.indices.all { state.board[it].contentEquals(start.board[it]) })
+                assertEquals(DraughtsState.TURN_BLACK, state.agentTurn)
+            }
+            assertFalse("ply $ply", isOver(simulator, state))
+        }
+        assertEquals(start.positionKey(), state.positionKey())
+        assertTrue(simulator.calculateLegalActions(state)[0].isNotEmpty())
+    }
+
+    @Test
+    fun manMoveResetsRepetitionAndKingMoveCount() {
+        val simulator = DraughtsSimulator()
+        var state = kingsWithMen()
+        state = play(simulator, state, listOf(DraughtsAction(2, 2, 3, 3), DraughtsAction(9, 1, 8, 2)))
+        assertEquals(2, state.positionHistory.size)
+        assertEquals(2, state.kingMoveCount)
+        state = play(simulator, state, listOf(DraughtsAction(0, 2, 1, 3)))
+        assertTrue(state.positionHistory.isEmpty())
+        assertEquals(0, state.kingMoveCount)
+    }
+
+    @Test
+    fun captureResetsRepetitionAndKingMoveCount() {
+        val simulator = DraughtsSimulator()
+        val state = emptyBoard()
+        state.set(0, 0, DraughtsState.WHITE_KING)
+        state.set(4, 4, DraughtsState.BLACK_MAN)
+        state.set(9, 1, DraughtsState.BLACK_KING)
+        state.positionHistory.add(state.positionKey())
+        state.kingMoveCount = 49
+        val next = simulator.stateTransition(state, listOf(DraughtsAction(0, 0, 5, 5), null))
+        assertTrue(next.positionHistory.isEmpty())
+        assertEquals(0, next.kingMoveCount)
+    }
+
+    @Test
+    fun twentyFiveKingMovesEachDraw() {
+        val simulator = DraughtsSimulator()
+        var state = kingsWithMen()
+        state = play(simulator, state, listOf(DraughtsAction(2, 2, 4, 4)))
+        assertEquals(1, state.kingMoveCount)
+        // 24 moves each, then one more each.
+        state.kingMoveCount = 48
+        state.positionHistory.clear()
+        assertFalse(isOver(simulator, state))
+        state = play(simulator, state, listOf(DraughtsAction(9, 1, 8, 2)))
+        assertEquals(49, state.kingMoveCount)
+        assertFalse(isOver(simulator, state))
+        state = play(simulator, state, listOf(DraughtsAction(4, 4, 3, 3)))
+        assertEquals(50, state.kingMoveCount)
+        assertTrue(isOver(simulator, state))
+        assertNeutral(simulator.calculateRewards(state))
+    }
+
+    @Test
+    fun threeKingsAgainstOneKingDrawsAfterSixteenMovesEach() {
+        val simulator = DraughtsSimulator()
+        val state = emptyBoard()
+        state.set(2, 2, DraughtsState.WHITE_KING)
+        state.set(0, 8, DraughtsState.WHITE_KING)
+        state.set(0, 4, DraughtsState.WHITE_KING)
+        state.set(1, 5, DraughtsState.BLACK_MAN)
+        state.set(9, 1, DraughtsState.BLACK_KING)
+        // Capturing the last black man first reaches three kings against one king.
+        var next = simulator.stateTransition(state, listOf(DraughtsAction(0, 4, 2, 6), null))
+        assertEquals(DraughtsState.ENDGAME_SIXTEEN, next.endgameGroup)
+        assertEquals(0, next.endgameMoveCount)
+        next = play(simulator, next, listOf(DraughtsAction(9, 1, 8, 2), DraughtsAction(2, 2, 4, 4)))
+        assertEquals(2, next.endgameMoveCount)
+        // 15 moves each, then one more each.
+        next.endgameMoveCount = 30
+        next = play(simulator, next, listOf(DraughtsAction(8, 2, 9, 1)))
+        assertFalse(isOver(simulator, next))
+        next = play(simulator, next, listOf(DraughtsAction(4, 4, 3, 3)))
+        assertEquals(32, next.endgameMoveCount)
+        assertTrue(isOver(simulator, next))
+        assertNeutral(simulator.calculateRewards(next))
+    }
+
+    @Test
+    fun oneKingAgainstOneKingDrawsAfterFiveMovesEach() {
+        val simulator = DraughtsSimulator()
+        var state = emptyBoard()
+        state.set(2, 2, DraughtsState.WHITE_KING)
+        state.set(9, 1, DraughtsState.BLACK_KING)
+        state.endgameGroup = DraughtsState.ENDGAME_FIVE
+        for (ply in 0 until 10) {
+            assertFalse("ply $ply", isOver(simulator, state))
+            state = play(simulator, state, listOf(triangleAction(state, ply)))
+        }
+        assertEquals(10, state.endgameMoveCount)
+        assertTrue(isOver(simulator, state))
+        assertNeutral(simulator.calculateRewards(state))
+    }
+
+    @Test
+    fun reachingTheFiveMoveGroupRestartsTheCount() {
+        val simulator = DraughtsSimulator()
+        var state = emptyBoard()
+        state.set(2, 2, DraughtsState.WHITE_KING)
+        state.set(0, 8, DraughtsState.WHITE_KING)
+        state.set(7, 3, DraughtsState.WHITE_KING)
+        state.set(6, 4, DraughtsState.BLACK_KING)
+        state.agentTurn = DraughtsState.TURN_BLACK
+        state.endgameGroup = DraughtsState.ENDGAME_SIXTEEN
+        state.endgameMoveCount = 25
+        // Black takes a king: two kings against one king.
+        state = simulator.stateTransition(state, listOf(null, DraughtsAction(6, 4, 8, 2)))
+        assertEquals(DraughtsState.ENDGAME_FIVE, state.endgameGroup)
+        assertEquals(0, state.endgameMoveCount)
+        for (ply in 0 until 10) {
+            assertFalse("ply $ply", isOver(simulator, state))
+            state = play(simulator, state, listOf(triangleAction(state, ply)))
+        }
+        assertTrue(isOver(simulator, state))
+    }
+
+    @Test
+    fun noMoveLosesEvenWhenADrawRuleHolds() {
+        val simulator = DraughtsSimulator()
+        val state = emptyBoard()
+        state.set(1, 1, DraughtsState.BLACK_MAN)
+        state.set(9, 9, DraughtsState.WHITE_KING)
+        state.agentTurn = DraughtsState.TURN_BLACK
+        state.set(0, 0, DraughtsState.WHITE_MAN)
+        state.set(2, 0, DraughtsState.WHITE_MAN)
+        state.kingMoveCount = 50
+        assertTrue(simulator.calculateLegalActions(state)[1].isEmpty())
+        val rewards = simulator.calculateRewards(state)
+        assertEquals(1, rewards[0])
+        assertEquals(-1, rewards[1])
+    }
+
+    @Test
+    fun moveThatCompletesEndgameLimitAndBlocksOpponentWins() {
+        val simulator = DraughtsSimulator()
+        val state = emptyBoard()
+        state.set(9, 9, DraughtsState.BLACK_KING)
+        state.set(8, 8, DraughtsState.WHITE_KING)
+        state.set(5, 5, DraughtsState.WHITE_KING)
+        state.set(0, 2, DraughtsState.WHITE_KING)
+        state.endgameGroup = DraughtsState.ENDGAME_SIXTEEN
+        state.endgameMoveCount = 31
+        val next = simulator.stateTransition(state, listOf(DraughtsAction(5, 5, 7, 7), null))
+        assertEquals(32, next.endgameMoveCount)
+        assertTrue(isOver(simulator, next))
+        val rewards = simulator.calculateRewards(next)
+        assertEquals(1, rewards[0])
+        assertEquals(-1, rewards[1])
+    }
+
+    @Test
+    fun captureOfLastPieceWinsWhenDrawCountersAreFull() {
+        val simulator = DraughtsSimulator()
+        val state = emptyBoard()
+        state.set(0, 0, DraughtsState.WHITE_KING)
+        state.set(4, 4, DraughtsState.BLACK_KING)
+        state.kingMoveCount = 49
+        state.endgameGroup = DraughtsState.ENDGAME_FIVE
+        state.endgameMoveCount = 9
+        val next = simulator.stateTransition(state, listOf(DraughtsAction(0, 0, 5, 5), null))
+        val rewards = simulator.calculateRewards(next)
+        assertEquals(1, rewards[0])
+        assertEquals(-1, rewards[1])
+    }
+
+    @Test
+    fun multiJumpCountsAsOneMove() {
+        val simulator = DraughtsSimulator()
+        val state = emptyBoard()
+        state.set(0, 0, DraughtsState.WHITE_KING)
+        state.set(2, 2, DraughtsState.BLACK_MAN)
+        state.set(5, 1, DraughtsState.BLACK_MAN)
+        state.set(9, 7, DraughtsState.BLACK_MAN)
+        state.set(9, 9, DraughtsState.BLACK_KING)
+        state.positionHistory.add("earlier")
+        state.kingMoveCount = 10
+        val mid = simulator.stateTransition(state, listOf(DraughtsAction(0, 0, 3, 3), null))
+        assertEquals(3, mid.mustContinueFromX)
+        // Nothing is counted in the middle of the capture.
+        assertEquals(listOf("earlier"), mid.positionHistory)
+        assertEquals(10, mid.kingMoveCount)
+        assertEquals(DraughtsState.ENDGAME_NONE, mid.endgameGroup)
+        assertFalse(isOver(simulator, mid))
+
+        val end = simulator.stateTransition(mid, listOf(DraughtsAction(3, 3, 6, 0), null))
+        assertEquals(DraughtsState.TURN_BLACK, end.agentTurn)
+        assertTrue(end.positionHistory.isEmpty())
+        assertEquals(0, end.kingMoveCount)
+        // King against king and man: the five-move group, reached by this one move.
+        assertEquals(DraughtsState.ENDGAME_FIVE, end.endgameGroup)
+        assertEquals(0, end.endgameMoveCount)
+    }
+
     private fun emptyBoard(): DraughtsState {
         val state = DraughtsState()
         for (x in 0 until DraughtsState.SIZE) {
@@ -274,5 +502,48 @@ class DraughtsSimulatorTest {
             }
         }
         return state
+    }
+
+    /** White king, black king, and a man each, so no endgame limit applies. */
+    private fun kingsWithMen(): DraughtsState {
+        val state = emptyBoard()
+        state.set(2, 2, DraughtsState.WHITE_KING)
+        state.set(0, 2, DraughtsState.WHITE_MAN)
+        state.set(9, 1, DraughtsState.BLACK_KING)
+        state.set(9, 9, DraughtsState.BLACK_MAN)
+        return state
+    }
+
+    /** Next move of the white triangle (2,2) -> (4,4) -> (3,3) or the black shuffle (9,1) <-> (8,2). */
+    private fun triangleAction(state: DraughtsState, ply: Int): DraughtsAction {
+        return if (state.agentTurn == DraughtsState.TURN_WHITE) {
+            when {
+                state.get(2, 2) == DraughtsState.WHITE_KING -> DraughtsAction(2, 2, 4, 4)
+                state.get(4, 4) == DraughtsState.WHITE_KING -> DraughtsAction(4, 4, 3, 3)
+                else -> DraughtsAction(3, 3, 2, 2)
+            }
+        } else {
+            if (state.get(9, 1) == DraughtsState.BLACK_KING) DraughtsAction(9, 1, 8, 2) else DraughtsAction(8, 2, 9, 1)
+        }.also { assertTrue("ply $ply: $it", legalFor(state).contains(it)) }
+    }
+
+    private fun legalFor(state: DraughtsState): Set<DraughtsAction> =
+        DraughtsSimulator().calculateLegalActions(state)[state.agentTurn.toInt()]
+
+    private fun play(simulator: DraughtsSimulator, start: DraughtsState, moves: List<DraughtsAction>): DraughtsState {
+        var state = start
+        for (move in moves) {
+            val actions = if (state.agentTurn == DraughtsState.TURN_WHITE) listOf(move, null) else listOf(null, move)
+            state = simulator.stateTransition(state, actions)
+        }
+        return state
+    }
+
+    private fun isOver(simulator: DraughtsSimulator, state: DraughtsState): Boolean =
+        simulator.calculateLegalActions(state).all { it.isEmpty() }
+
+    private fun assertNeutral(rewards: IntArray) {
+        assertEquals(0, rewards[0])
+        assertEquals(0, rewards[1])
     }
 }

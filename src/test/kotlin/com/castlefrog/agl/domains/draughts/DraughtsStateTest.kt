@@ -57,4 +57,40 @@ class DraughtsStateTest {
         assertNotEquals(state, copy)
         assertEquals(1, state.pendingCaptures.size)
     }
+
+    @Test
+    fun drawFieldsCopiedAndCompared() {
+        val state = DraughtsState()
+        state.positionHistory.add(state.positionKey())
+        state.kingMoveCount = 7
+        state.endgameGroup = DraughtsState.ENDGAME_SIXTEEN
+        state.endgameMoveCount = 3
+        val copy = state.copy()
+        assertEquals(state, copy)
+        assertEquals(state.hashCode(), copy.hashCode())
+        assertNotSame(state.positionHistory, copy.positionHistory)
+
+        copy.positionHistory.add("other")
+        assertNotEquals(state, copy)
+        assertEquals(1, state.positionHistory.size)
+
+        for (change in listOf<(DraughtsState) -> Unit>(
+            { it.kingMoveCount++ },
+            { it.endgameGroup = DraughtsState.ENDGAME_FIVE },
+            { it.endgameMoveCount++ }
+        )) {
+            val changed = state.copy()
+            change(changed)
+            assertNotEquals(state, changed)
+            assertNotEquals(state.hashCode(), changed.hashCode())
+        }
+    }
+
+    @Test
+    fun positionKeyDependsOnPlayerToMove() {
+        val state = DraughtsState()
+        val other = state.copy()
+        other.agentTurn = DraughtsState.TURN_BLACK
+        assertNotEquals(state.positionKey(), other.positionKey())
+    }
 }

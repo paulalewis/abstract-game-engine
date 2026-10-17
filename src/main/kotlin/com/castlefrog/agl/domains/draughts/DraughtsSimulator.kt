@@ -12,6 +12,24 @@ import com.castlefrog.agl.requireLegalAction
  * board until the sequence ends. Multi-jumps continue on the same turn via
  * [DraughtsState.mustContinueFromX]. A man promotes only when its move ends
  * on the last rank.
+ *
+ * A player with no legal move loses. Otherwise the game is an automatic draw
+ * (neutral rewards, no legal actions) when any of these FMJD article 6 rules holds:
+ *
+ * - Threefold repetition (6.2): the same pieces on the same squares, with the same
+ *   player to move, occur for the third time. Only positions since the last man
+ *   move or capture count; see [DraughtsState.positionHistory].
+ * - Twenty-five king moves (6.3): each player has made 25 moves in a row that were
+ *   king moves without a capture (50 plies); see [DraughtsState.kingMoveCount].
+ * - Endgame limits (6.4, 6.5): three kings, two kings and a man, or a king and two
+ *   men against one king draws after 16 moves each; two kings, a king and a man, or
+ *   one king against one king draws after 5 moves each. Moves are counted from when
+ *   that material is first reached, and the count restarts when the material
+ *   changes from the first group to the second; see [DraughtsState.endgameGroup].
+ *
+ * The no-move loss is checked first, so a move that leaves the opponent without a
+ * move wins even if it also completes a draw. Moves are counted when a turn ends: a
+ * multi-jump is one move, and a position in the middle of one never counts.
  */
 class DraughtsSimulator : Simulator<DraughtsState, DraughtsAction> {
 
@@ -21,21 +39,21 @@ class DraughtsSimulator : Simulator<DraughtsState, DraughtsAction> {
     override fun numberOfPlayers(): Int = NUMBER_OF_PLAYERS
 
     override fun calculateRewards(state: DraughtsState): IntArray {
-        val legal = calculateLegalActions(state)
         val turn = state.agentTurn.toInt()
-        if (legal[turn].isNotEmpty()) {
+        if (collectMoves(state).isNotEmpty()) {
+            // Still playing, or an automatic draw.
             return AdversarialRewards.neutral()
         }
-        // Side to move has no moves — loses (opponent wins).
+        // Side to move has no moves — loses (opponent wins), even if a draw rule also holds.
         return if (turn == 0) AdversarialRewards.secondPlayerWins() else AdversarialRewards.firstPlayerWins()
     }
 
     override fun calculateLegalActions(state: DraughtsState): List<Set<DraughtsAction>> {
         val legal = listOf(mutableSetOf<DraughtsAction>(), mutableSetOf())
-        val turn = state.agentTurn.toInt()
-        val captures = collectCaptures(state)
-        val moves = if (captures.isNotEmpty()) captures else collectQuietMoves(state)
-        legal[turn].addAll(moves)
+        if (isDraw(state)) {
+            return legal
+        }
+        legal[state.agentTurn.toInt()].addAll(collectMoves(state))
         return legal
     }
 
@@ -63,7 +81,75 @@ class DraughtsSimulator : Simulator<DraughtsState, DraughtsAction> {
         next.mustContinueFromX = -1
         next.mustContinueFromY = -1
         next.agentTurn = nextPlayerTurnSequential(agentTurn, NUMBER_OF_PLAYERS).toByte()
+        updateDrawCounters(state, next, isIrreversible = captured != null || !state.isKing(piece))
         return next
+    }
+
+    private fun collectMoves(state: DraughtsState): Set<DraughtsAction> {
+        val captures = collectCaptures(state)
+        return if (captures.isNotEmpty()) captures else collectQuietMoves(state)
+    }
+
+    /** Whether a draw rule ends the game. Never true in the middle of a multi-jump. */
+    private fun isDraw(state: DraughtsState): Boolean {
+        if (state.mustContinueFromX >= 0) return false
+        val key = state.positionKey()
+        if (state.positionHistory.count { it == key } >= REPETITIONS_FOR_DRAW - 1) return true
+        if (state.kingMoveCount >= KING_MOVE_PLIES_FOR_DRAW) return true
+        return when (state.endgameGroup) {
+            DraughtsState.ENDGAME_SIXTEEN -> state.endgameMoveCount >= ENDGAME_SIXTEEN_PLIES_FOR_DRAW
+            DraughtsState.ENDGAME_FIVE -> state.endgameMoveCount >= ENDGAME_FIVE_PLIES_FOR_DRAW
+            else -> false
+        }
+    }
+
+    /** Called once per turn, when [previous] was the position at the start of the turn just ended. */
+    private fun updateDrawCounters(previous: DraughtsState, next: DraughtsState, isIrreversible: Boolean) {
+        if (isIrreversible) {
+            next.positionHistory.clear()
+            next.kingMoveCount = 0
+        } else {
+            next.positionHistory.add(previous.positionKey())
+            next.kingMoveCount = previous.kingMoveCount + 1
+        }
+        val group = endgameGroup(next)
+        if (group != previous.endgameGroup) {
+            next.endgameGroup = group
+            next.endgameMoveCount = 0
+        } else if (group != DraughtsState.ENDGAME_NONE) {
+            next.endgameMoveCount = previous.endgameMoveCount + 1
+        }
+    }
+
+    private fun endgameGroup(state: DraughtsState): Byte {
+        var whiteMen = 0
+        var whiteKings = 0
+        var blackMen = 0
+        var blackKings = 0
+        for (x in 0 until DraughtsState.SIZE) {
+            for (y in 0 until DraughtsState.SIZE) {
+                when (state.get(x, y)) {
+                    DraughtsState.WHITE_MAN -> whiteMen++
+                    DraughtsState.WHITE_KING -> whiteKings++
+                    DraughtsState.BLACK_MAN -> blackMen++
+                    DraughtsState.BLACK_KING -> blackKings++
+                }
+            }
+        }
+        return when {
+            blackKings == 1 && blackMen == 0 -> endgameGroupAgainstLoneKing(whiteKings, whiteMen)
+            whiteKings == 1 && whiteMen == 0 -> endgameGroupAgainstLoneKing(blackKings, blackMen)
+            else -> DraughtsState.ENDGAME_NONE
+        }
+    }
+
+    private fun endgameGroupAgainstLoneKing(kings: Int, men: Int): Byte {
+        if (kings < 1) return DraughtsState.ENDGAME_NONE
+        return when (kings + men) {
+            1, 2 -> DraughtsState.ENDGAME_FIVE
+            3 -> DraughtsState.ENDGAME_SIXTEEN
+            else -> DraughtsState.ENDGAME_NONE
+        }
     }
 
     private fun collectCaptures(state: DraughtsState): Set<DraughtsAction> {
@@ -304,6 +390,10 @@ class DraughtsSimulator : Simulator<DraughtsState, DraughtsAction> {
 
     companion object {
         private const val NUMBER_OF_PLAYERS = 2
+        private const val REPETITIONS_FOR_DRAW = 3
+        private const val KING_MOVE_PLIES_FOR_DRAW = 50
+        private const val ENDGAME_SIXTEEN_PLIES_FOR_DRAW = 32
+        private const val ENDGAME_FIVE_PLIES_FOR_DRAW = 10
         private val DIAGONALS = listOf(-1 to 1, 1 to 1, -1 to -1, 1 to -1)
     }
 }
