@@ -17,7 +17,8 @@ import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 
 /**
- * Parameterized harness: every domain must satisfy [SimulatorContract].
+ * Parameterized harness: every domain must satisfy [SimulatorContract], including
+ * [Simulator.isLegalAction] agreeing with [Simulator.calculateLegalActions].
  */
 @RunWith(Parameterized::class)
 class CrossDomainSimulatorContractTest(

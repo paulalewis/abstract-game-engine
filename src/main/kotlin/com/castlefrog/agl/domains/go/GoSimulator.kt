@@ -67,10 +67,27 @@ class GoSimulator(
         return legal
     }
 
+    /**
+     * Checks [action] alone: one trial board and one superko scan for a placement,
+     * instead of one per empty point as in [calculateLegalActions].
+     */
+    override fun isLegalAction(state: GoState, agentTurn: Int, action: GoAction): Boolean {
+        if (state.consecutivePasses >= 2 || agentTurn != state.agentTurn.toInt()) {
+            return false
+        }
+        if (action.isPass) {
+            return action == GoAction.pass()
+        }
+        if (!state.isOnBoard(action.x, action.y) || state.get(action.x, action.y) != GoState.LOCATION_EMPTY) {
+            return false
+        }
+        val stone = if (agentTurn == 0) GoState.LOCATION_BLACK else GoState.LOCATION_WHITE
+        return isLegalPlacement(state, action.x, action.y, stone)
+    }
+
     override fun stateTransition(state: GoState, actions: List<GoAction?>): GoState {
         val agentTurn = state.agentTurn.toInt()
-        val legalActions = calculateLegalActions(state)
-        val action = requireLegalAction(actions, agentTurn, legalActions[agentTurn], state)
+        val action = requireLegalAction(actions, agentTurn, state) { isLegalAction(state, agentTurn, it) }
         val next = state.copy()
         if (action.isPass) {
             next.consecutivePasses += 1
