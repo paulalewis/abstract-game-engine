@@ -3,6 +3,7 @@ package com.castlefrog.agl.domains.havannah
 import com.castlefrog.agl.IllegalActionException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -83,6 +84,84 @@ class HavannahSimulatorTest {
         expectedState.locations[0][1] = HavannahState.LOCATION_WHITE
         expectedState.agentTurn = HavannahState.TURN_BLACK
         assertEquals(expectedState, state3)
+    }
+
+    @Test
+    fun isLegalActionOccupiedCell() {
+        val simulator = HavannahSimulator(base = 5, pieRule = true)
+        val state = simulator.stateTransition(simulator.initialState, listOf(HavannahAction(0, 0), null))
+        val state2 = simulator.stateTransition(state, listOf(null, HavannahAction(0, 1)))
+        assertIllegal(simulator, state2, HavannahState.TURN_BLACK.toInt(), HavannahAction(0, 1))
+        assertIllegal(simulator, state2, HavannahState.TURN_BLACK.toInt(), HavannahAction(0, 0))
+    }
+
+    @Test
+    fun isLegalActionCellOutsideHexagon() {
+        val simulator = HavannahSimulator(base = 5)
+        val state = simulator.initialState
+        // In the 9x9 array but outside the hexagon.
+        assertIllegal(simulator, state, HavannahState.TURN_BLACK.toInt(), HavannahAction(5, 0))
+        assertIllegal(simulator, state, HavannahState.TURN_BLACK.toInt(), HavannahAction(0, 5))
+        // Outside the array.
+        assertIllegal(simulator, state, HavannahState.TURN_BLACK.toInt(), HavannahAction(9, 4))
+        assertIllegal(simulator, state, HavannahState.TURN_BLACK.toInt(), HavannahAction(-1, 0))
+    }
+
+    @Test
+    fun isLegalActionSwapOnSecondMove() {
+        val simulator = HavannahSimulator(base = 5, pieRule = true)
+        val state = simulator.stateTransition(simulator.initialState, listOf(HavannahAction(2, 3), null))
+        val swap = HavannahAction(2, 3)
+        assertTrue(simulator.isLegalAction(state, HavannahState.TURN_WHITE.toInt(), swap))
+        assertTrue(swap in simulator.calculateLegalActions(state)[HavannahState.TURN_WHITE.toInt()])
+    }
+
+    @Test
+    fun isLegalActionSwapAfterSecondMove() {
+        val simulator = HavannahSimulator(base = 5, pieRule = true)
+        var state = simulator.stateTransition(simulator.initialState, listOf(HavannahAction(2, 3), null))
+        state = simulator.stateTransition(state, listOf(null, HavannahAction(4, 4)))
+        state = simulator.stateTransition(state, listOf(HavannahAction(1, 1), null))
+        // White's turn again, with three stones down.
+        assertIllegal(simulator, state, HavannahState.TURN_WHITE.toInt(), HavannahAction(2, 3))
+        assertIllegal(simulator, state, HavannahState.TURN_WHITE.toInt(), HavannahAction(1, 1))
+    }
+
+    @Test
+    fun isLegalActionNoSwapBackAfterSwap() {
+        val simulator = HavannahSimulator(base = 5, pieRule = true)
+        var state = simulator.stateTransition(simulator.initialState, listOf(HavannahAction(2, 3), null))
+        state = simulator.stateTransition(state, listOf(null, HavannahAction(2, 3)))
+        // Black's turn with white's stone the only one on the board.
+        assertIllegal(simulator, state, HavannahState.TURN_BLACK.toInt(), HavannahAction(2, 3))
+    }
+
+    @Test
+    fun isLegalActionWrongPlayer() {
+        val simulator = HavannahSimulator(base = 5)
+        assertIllegal(simulator, simulator.initialState, HavannahState.TURN_WHITE.toInt(), HavannahAction(2, 2))
+        val state = simulator.stateTransition(simulator.initialState, listOf(HavannahAction(0, 0), null))
+        assertIllegal(simulator, state, HavannahState.TURN_BLACK.toInt(), HavannahAction(2, 2))
+    }
+
+    @Test
+    fun isLegalActionAfterWin() {
+        val locations = Array(9) { ByteArray(9) }
+        locations[2][2] = HavannahState.LOCATION_BLACK
+        locations[2][3] = HavannahState.LOCATION_BLACK
+        locations[3][2] = HavannahState.LOCATION_BLACK
+        locations[4][4] = HavannahState.LOCATION_BLACK
+        locations[4][3] = HavannahState.LOCATION_BLACK
+        locations[3][4] = HavannahState.LOCATION_BLACK
+        locations[3][3] = HavannahState.LOCATION_WHITE
+        locations[0][0] = HavannahState.LOCATION_WHITE
+        locations[0][1] = HavannahState.LOCATION_WHITE
+        locations[1][0] = HavannahState.LOCATION_WHITE
+        locations[1][2] = HavannahState.LOCATION_WHITE
+        val state = HavannahState(5, locations, HavannahState.TURN_WHITE)
+        val simulator = HavannahSimulator(base = 5)
+        assertArrayEquals(intArrayOf(1, -1), simulator.calculateRewards(state))
+        assertIllegal(simulator, state, HavannahState.TURN_WHITE.toInt(), HavannahAction(4, 0))
     }
 
     @Test
@@ -288,6 +367,23 @@ class HavannahSimulatorTest {
             else -> ring to farWhiteMoves(5)
         }
         assertBlackWinsOnLastMove(blackMoves, whiteMoves)
+    }
+
+    /**
+     * [action] is illegal for [agentTurn]: [HavannahSimulator.isLegalAction] and
+     * [HavannahSimulator.calculateLegalActions] agree, and [HavannahSimulator.stateTransition] throws.
+     */
+    private fun assertIllegal(
+        simulator: HavannahSimulator,
+        state: HavannahState,
+        agentTurn: Int,
+        action: HavannahAction
+    ) {
+        assertFalse(simulator.isLegalAction(state, agentTurn, action))
+        assertFalse(action in simulator.calculateLegalActions(state)[agentTurn])
+        assertThrows(IllegalActionException::class.java) {
+            simulator.stateTransition(state, List(2) { if (it == agentTurn) action else null })
+        }
     }
 
     /** White stones along the x = 0 edge, away from both corners. */
