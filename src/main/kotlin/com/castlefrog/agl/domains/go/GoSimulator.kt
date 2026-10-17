@@ -39,13 +39,46 @@ class GoSimulator(
         if (state.consecutivePasses < 2) {
             return AdversarialRewards.neutral()
         }
-        val black = areaScore(state, GoState.LOCATION_BLACK)
-        val white = areaScore(state, GoState.LOCATION_WHITE) + komi
+        val score = score(state)
         return when {
-            black > white -> AdversarialRewards.firstPlayerWins()
-            white > black -> AdversarialRewards.secondPlayerWins()
+            score.black > score.white -> AdversarialRewards.firstPlayerWins()
+            score.white > score.black -> AdversarialRewards.secondPlayerWins()
             else -> AdversarialRewards.neutral()
         }
+    }
+
+    /**
+     * Area score of [state]: each side's stones and territory, with [komi] for white.
+     * Works for any state, finished or not. [calculateRewards] compares these totals.
+     */
+    fun score(state: GoState): GoScore {
+        var blackStones = 0
+        var whiteStones = 0
+        var blackTerritory = 0
+        var whiteTerritory = 0
+        val visited = Array(state.boardSize) { BooleanArray(state.boardSize) }
+        for (x in 0 until state.boardSize) {
+            for (y in 0 until state.boardSize) {
+                when (state.get(x, y)) {
+                    GoState.LOCATION_BLACK -> blackStones += 1
+                    GoState.LOCATION_WHITE -> whiteStones += 1
+                    GoState.LOCATION_EMPTY -> {
+                        if (!visited[x][y]) {
+                            val region = ArrayList<Pair<Int, Int>>()
+                            val borders = HashSet<Byte>()
+                            floodEmpty(state, x, y, visited, region, borders)
+                            if (borders.size == 1) {
+                                when (borders.first()) {
+                                    GoState.LOCATION_BLACK -> blackTerritory += region.size
+                                    GoState.LOCATION_WHITE -> whiteTerritory += region.size
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return GoScore(blackStones, blackTerritory, whiteStones, whiteTerritory, komi)
     }
 
     override fun calculateLegalActions(state: GoState): List<Set<GoAction>> {
@@ -148,30 +181,6 @@ class GoSimulator(
         )
         applyPlacement(trial, x, y, stone)
         return !state.coloringHasOccurred(trial.boardSnapshot())
-    }
-
-    private fun areaScore(state: GoState, color: Byte): Double {
-        var stones = 0
-        val visited = Array(state.boardSize) { BooleanArray(state.boardSize) }
-        var territory = 0
-        for (x in 0 until state.boardSize) {
-            for (y in 0 until state.boardSize) {
-                when (state.get(x, y)) {
-                    color -> stones += 1
-                    GoState.LOCATION_EMPTY -> {
-                        if (!visited[x][y]) {
-                            val region = ArrayList<Pair<Int, Int>>()
-                            val borders = HashSet<Byte>()
-                            floodEmpty(state, x, y, visited, region, borders)
-                            if (borders.size == 1 && borders.contains(color)) {
-                                territory += region.size
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return (stones + territory).toDouble()
     }
 
     private fun floodEmpty(

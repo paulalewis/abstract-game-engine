@@ -261,4 +261,95 @@ class GoSimulatorTest {
         assertTrue(simulator.isLegalAction(state, 0, GoAction.pass()))
         assertTrue(simulator.isLegalAction(state, 0, GoAction.place(2, 2)))
     }
+
+    @Test
+    fun scoreOfEmptyBoardIsOnlyKomi() {
+        val simulator = GoSimulator(boardSize = 5)
+        val score = simulator.score(simulator.initialState)
+        assertEquals(GoScore(0, 0, 0, 0, 7.0), score)
+        assertEquals(0.0, score.black, 0.0)
+        assertEquals(7.0, score.white, 0.0)
+    }
+
+    @Test
+    fun scoreCountsStonesAndTerritoryForEachSide() {
+        val simulator = GoSimulator(boardSize = 4, komi = 0.5)
+        //   . X O .
+        //   . X O .
+        //   . X O .
+        //   . X O .
+        val state = walls(boardSize = 4, blackX = 1, whiteX = 2)
+        val score = simulator.score(state)
+        assertEquals(GoScore(4, 4, 4, 4, 0.5), score)
+        assertEquals(8.0, score.black, 0.0)
+        assertEquals(8.5, score.white, 0.0)
+    }
+
+    @Test
+    fun scoreCountsRegionTouchingBothColorsForNeither() {
+        val simulator = GoSimulator(boardSize = 5, komi = 0.0)
+        //   . X . O .
+        //   . X . O .
+        //   . X . O .
+        //   . X . O .
+        //   . X . O .
+        val state = walls(boardSize = 5, blackX = 1, whiteX = 3)
+        assertEquals(GoScore(5, 5, 5, 5, 0.0), simulator.score(state))
+    }
+
+    @Test
+    fun scoreDoesNotChangeTheState() {
+        val simulator = GoSimulator(boardSize = 4)
+        val state = walls(boardSize = 4, blackX = 1, whiteX = 2)
+        val before = state.copy()
+        simulator.score(state)
+        assertEquals(before, state)
+    }
+
+    @Test
+    fun finishedGameWinnerFromScoreMatchesRewards() {
+        // Black 8, white 8: a tie with no komi, white wins by komi 0.5.
+        assertScoreAgreesWithRewards(boardSize = 4, blackX = 1, whiteX = 2, komi = 0.0, expected = intArrayOf(0, 0))
+        assertScoreAgreesWithRewards(boardSize = 4, blackX = 1, whiteX = 2, komi = 0.5, expected = intArrayOf(-1, 1))
+        // Black 5 + 10, white 5 + 5 + 0.5.
+        assertScoreAgreesWithRewards(boardSize = 5, blackX = 2, whiteX = 3, komi = 0.5, expected = intArrayOf(1, -1))
+    }
+
+    /** Plays a full column for each side, black first, then two passes. */
+    private fun assertScoreAgreesWithRewards(
+        boardSize: Int,
+        blackX: Int,
+        whiteX: Int,
+        komi: Double,
+        expected: IntArray
+    ) {
+        val simulator = GoSimulator(boardSize = boardSize, komi = komi)
+        var state = simulator.initialState
+        for (y in 0 until boardSize) {
+            state = simulator.stateTransition(state, listOf(GoAction.place(blackX, y), null))
+            state = simulator.stateTransition(state, listOf(null, GoAction.place(whiteX, y)))
+        }
+        state = simulator.stateTransition(state, listOf(GoAction.pass(), null))
+        state = simulator.stateTransition(state, listOf(null, GoAction.pass()))
+        assertTrue(simulator.calculateLegalActions(state).all { it.isEmpty() })
+
+        val score = simulator.score(state)
+        val fromScore = when {
+            score.black > score.white -> intArrayOf(1, -1)
+            score.white > score.black -> intArrayOf(-1, 1)
+            else -> intArrayOf(0, 0)
+        }
+        assertArrayEquals(expected, fromScore)
+        assertArrayEquals(fromScore, simulator.calculateRewards(state))
+    }
+
+    /** A board with a full black column at [blackX] and a full white column at [whiteX]. */
+    private fun walls(boardSize: Int, blackX: Int, whiteX: Int): GoState {
+        val state = GoState(boardSize = boardSize)
+        for (y in 0 until boardSize) {
+            state.set(blackX, y, GoState.LOCATION_BLACK)
+            state.set(whiteX, y, GoState.LOCATION_WHITE)
+        }
+        return state
+    }
 }
