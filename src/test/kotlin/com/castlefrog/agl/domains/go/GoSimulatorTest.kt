@@ -70,54 +70,9 @@ class GoSimulatorTest {
     }
 
     @Test
-    fun multiStoneSuicideIsLegal() {
-        val simulator = GoSimulator(boardSize = 4)
-        val state = GoState(boardSize = 4)
-        // Black has a one-point eye at (2,1). White surrounds but keeps corner liberties,
-        // so filling the eye kills only black (board changes → allowed by superko).
-        //   . O O .
-        //   O X X O
-        //   O X . O
-        //   . O O .
-        state.set(1, 3, GoState.LOCATION_WHITE)
-        state.set(2, 3, GoState.LOCATION_WHITE)
-        state.set(0, 2, GoState.LOCATION_WHITE)
-        state.set(1, 2, GoState.LOCATION_BLACK)
-        state.set(2, 2, GoState.LOCATION_BLACK)
-        state.set(3, 2, GoState.LOCATION_WHITE)
-        state.set(0, 1, GoState.LOCATION_WHITE)
-        state.set(1, 1, GoState.LOCATION_BLACK)
-        state.set(3, 1, GoState.LOCATION_WHITE)
-        state.set(1, 0, GoState.LOCATION_WHITE)
-        state.set(2, 0, GoState.LOCATION_WHITE)
-        state.agentTurn = GoState.TURN_BLACK
-        val legal = simulator.calculateLegalActions(state)[0]
-        assertTrue(legal.contains(GoAction.place(2, 1)))
-
-        val next = simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
-        assertEquals(GoState.LOCATION_EMPTY, next.get(1, 1))
-        assertEquals(GoState.LOCATION_EMPTY, next.get(2, 1))
-        assertEquals(GoState.LOCATION_EMPTY, next.get(1, 2))
-        assertEquals(GoState.LOCATION_EMPTY, next.get(2, 2))
-        assertEquals(GoState.LOCATION_WHITE, next.get(0, 1))
-    }
-
-    @Test
     fun positionalSuperkoForbidsImmediateKoRecapture() {
         val simulator = GoSimulator(boardSize = 4)
-        val state = GoState(boardSize = 4)
-        // Classic one-stone ko: white at (1,1), liberty at (2,1).
-        //   . X O .
-        //   X O . O
-        //   . X O .
-        state.set(1, 2, GoState.LOCATION_BLACK)
-        state.set(2, 2, GoState.LOCATION_WHITE)
-        state.set(0, 1, GoState.LOCATION_BLACK)
-        state.set(1, 1, GoState.LOCATION_WHITE)
-        state.set(3, 1, GoState.LOCATION_WHITE)
-        state.set(1, 0, GoState.LOCATION_BLACK)
-        state.set(2, 0, GoState.LOCATION_WHITE)
-        state.agentTurn = GoState.TURN_BLACK
+        val state = koFixture()
 
         val afterTake = simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
         assertEquals(GoState.LOCATION_EMPTY, afterTake.get(1, 1))
@@ -187,18 +142,7 @@ class GoSimulatorTest {
     @Test
     fun superkoRepeatIsIllegal() {
         val simulator = GoSimulator(boardSize = 4)
-        val state = GoState(boardSize = 4)
-        //   . X O .
-        //   X O . O
-        //   . X O .
-        state.set(1, 2, GoState.LOCATION_BLACK)
-        state.set(2, 2, GoState.LOCATION_WHITE)
-        state.set(0, 1, GoState.LOCATION_BLACK)
-        state.set(1, 1, GoState.LOCATION_WHITE)
-        state.set(3, 1, GoState.LOCATION_WHITE)
-        state.set(1, 0, GoState.LOCATION_BLACK)
-        state.set(2, 0, GoState.LOCATION_WHITE)
-        state.agentTurn = GoState.TURN_BLACK
+        val state = koFixture()
         val afterTake = simulator.stateTransition(state, listOf(GoAction.place(2, 1), null))
 
         assertFalse(simulator.isLegalAction(afterTake, 1, GoAction.place(1, 1)))
@@ -342,6 +286,7 @@ class GoSimulatorTest {
         for ((x, y) in listOf(1 to 1, 2 to 1, 1 to 2, 2 to 2)) {
             assertEquals(GoState.LOCATION_EMPTY, next.get(x, y))
         }
+        assertEquals(GoState.LOCATION_WHITE, next.get(0, 1))
         assertEquals(0, next.capturedByBlack)
     }
 
@@ -379,18 +324,7 @@ class GoSimulatorTest {
     fun koAndSuperkoBehaveTheSameUnderBothRules() {
         for (rules in GoRules.entries) {
             val simulator = GoSimulator(boardSize = 4, rules = rules)
-            //   . X O .
-            //   X O . O
-            //   . X O .
-            val state = GoState(boardSize = 4)
-            state.set(1, 2, GoState.LOCATION_BLACK)
-            state.set(2, 2, GoState.LOCATION_WHITE)
-            state.set(0, 1, GoState.LOCATION_BLACK)
-            state.set(1, 1, GoState.LOCATION_WHITE)
-            state.set(3, 1, GoState.LOCATION_WHITE)
-            state.set(1, 0, GoState.LOCATION_BLACK)
-            state.set(2, 0, GoState.LOCATION_WHITE)
-            state.agentTurn = GoState.TURN_BLACK
+            val state = koFixture()
 
             // Taking the ko leaves the black stone with no liberties until the capture: legal.
             assertTrue("$rules", simulator.isLegalAction(state, 0, GoAction.place(2, 1)))
@@ -409,6 +343,27 @@ class GoSimulatorTest {
             later = simulator.stateTransition(later, listOf(GoAction.place(0, 3), null))
             assertTrue("$rules", simulator.isLegalAction(later, 1, GoAction.place(1, 1)))
         }
+    }
+
+    /**
+     * One-stone ko, black to play. Black (2,1) captures white (1,1); white retaking
+     * at (1,1) at once would repeat this coloring.
+     *
+     *   . X O .
+     *   X O . O
+     *   . X O .
+     */
+    private fun koFixture(): GoState {
+        val state = GoState(boardSize = 4)
+        state.set(1, 2, GoState.LOCATION_BLACK)
+        state.set(2, 2, GoState.LOCATION_WHITE)
+        state.set(0, 1, GoState.LOCATION_BLACK)
+        state.set(1, 1, GoState.LOCATION_WHITE)
+        state.set(3, 1, GoState.LOCATION_WHITE)
+        state.set(1, 0, GoState.LOCATION_BLACK)
+        state.set(2, 0, GoState.LOCATION_WHITE)
+        state.agentTurn = GoState.TURN_BLACK
+        return state
     }
 
     /**
