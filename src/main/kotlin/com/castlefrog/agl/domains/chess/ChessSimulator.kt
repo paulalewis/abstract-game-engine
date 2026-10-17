@@ -378,6 +378,13 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
         return next
     }
 
+    /**
+     * Whether the side to move in [state] is in check: its king is attacked by an enemy
+     * piece. A pinned piece still gives check. Checkmate is in check with no legal actions;
+     * stalemate is not in check.
+     */
+    fun isInCheck(state: ChessState): Boolean = isInCheck(state, state.agentTurn.toInt())
+
     internal fun isInCheck(state: ChessState, turn: Int): Boolean {
         val king = findKing(state, turn) ?: return false
         return isSquareAttacked(state, king.first, king.second, 1 - turn)

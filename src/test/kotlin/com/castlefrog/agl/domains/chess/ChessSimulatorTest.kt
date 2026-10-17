@@ -341,4 +341,74 @@ class ChessSimulatorTest {
         assertTrue(isOver(simulator, mated))
         assertArrayEquals(intArrayOf(1, -1), simulator.calculateRewards(mated))
     }
+
+    private fun emptyBoard(agentTurn: Byte): ChessState {
+        val state = ChessState()
+        for (x in 0 until 8) for (y in 0 until 8) state.set(x, y, ChessState.EMPTY)
+        state.agentTurn = agentTurn
+        state.castlingRights = 0
+        return state
+    }
+
+    @Test
+    fun startPositionIsNotInCheck() {
+        val simulator = ChessSimulator()
+        assertFalse(simulator.isInCheck(simulator.initialState))
+    }
+
+    @Test
+    fun simpleCheckIsInCheck() {
+        val simulator = ChessSimulator()
+        // White king e1, black rook e8, black king a8; white to move.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(4, 0, ChessState.KING.toByte())
+        state.set(4, 7, (-ChessState.ROOK).toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        assertTrue(simulator.isInCheck(state))
+        // Only the side to move is asked about.
+        state.agentTurn = ChessState.TURN_BLACK
+        assertFalse(simulator.isInCheck(state))
+    }
+
+    @Test
+    fun checkByPinnedPieceIsInCheck() {
+        val simulator = ChessSimulator()
+        // White king d4, white rook e1; black knight e6 pinned to black king e8; white to move.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(3, 3, ChessState.KING.toByte())
+        state.set(4, 0, ChessState.ROOK.toByte())
+        state.set(4, 5, (-ChessState.KNIGHT).toByte())
+        state.set(4, 7, (-ChessState.KING).toByte())
+        // The knight cannot move to take the king, but it still gives check.
+        state.agentTurn = ChessState.TURN_BLACK
+        assertTrue(simulator.calculateLegalActions(state)[1].none { it.fromX == 4 && it.fromY == 5 })
+        state.agentTurn = ChessState.TURN_WHITE
+        assertTrue(simulator.isInCheck(state))
+    }
+
+    @Test
+    fun checkmateIsInCheck() {
+        val simulator = ChessSimulator()
+        // KR vs K: white king a6, white rook h7, black king a8. Rh7-h8#.
+        val state = emptyBoard(ChessState.TURN_WHITE)
+        state.set(0, 5, ChessState.KING.toByte())
+        state.set(7, 6, ChessState.ROOK.toByte())
+        state.set(0, 7, (-ChessState.KING).toByte())
+        val mated = play(simulator, state, ChessAction(7, 6, 7, 7))
+        assertTrue(simulator.calculateLegalActions(mated)[1].isEmpty())
+        assertTrue(simulator.isInCheck(mated))
+    }
+
+    @Test
+    fun stalemateIsNotInCheck() {
+        val simulator = ChessSimulator()
+        // Black king a8, white queen b6, white king c1; black to move and has no moves.
+        val state = emptyBoard(ChessState.TURN_BLACK)
+        state.set(0, 7, (-ChessState.KING).toByte())
+        state.set(1, 5, ChessState.QUEEN.toByte())
+        state.set(2, 0, ChessState.KING.toByte())
+        assertTrue(simulator.calculateLegalActions(state)[1].isEmpty())
+        assertArrayEquals(intArrayOf(0, 0), simulator.calculateRewards(state))
+        assertFalse(simulator.isInCheck(state))
+    }
 }
