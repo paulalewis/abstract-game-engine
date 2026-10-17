@@ -40,11 +40,8 @@ class ChessState(
      * makes those positions unreachable. Its size therefore matches [halfmoveClock]
      * for states reached by play, and the fifty-move rule caps it at 100 entries.
      * When the current position's key already occurs twice, the position has occurred
-     * three times and [ChessSimulator] treats it as a draw.
-     *
-     * A key covers the pieces on each square, the side to move, castling rights, and
-     * the en passant file only when a legal en passant capture exists (Laws of Chess,
-     * article 9.2). See [ChessSimulator.positionKey].
+     * three times and [ChessSimulator] treats it as a draw. Keys are made by
+     * [ChessSimulator.positionKey].
      */
     val positionHistory: MutableList<String> = ArrayList()
 ) : State<ChessState> {

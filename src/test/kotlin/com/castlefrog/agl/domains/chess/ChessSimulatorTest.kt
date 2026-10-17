@@ -123,6 +123,7 @@ class ChessSimulatorTest {
         assertEquals(ChessState.KNIGHT.toByte(), state.get(5, 2))
         assertEquals(ChessState.EMPTY, state.get(6, 0))
     }
+
     private fun play(simulator: ChessSimulator, state: ChessState, vararg moves: ChessAction): ChessState {
         var s = state
         for (move in moves) {
@@ -296,6 +297,28 @@ class ChessSimulatorTest {
         // The position after ...Nf6 has no en passant in any occurrence: third time.
         state = play(simulator, state, blackKnightOut)
         assertTrue(isOver(simulator, state))
+    }
+
+    @Test
+    fun pinnedEnPassantCapturerDoesNotCountInPositionKey() {
+        val simulator = ChessSimulator()
+        // White king a5, white pawn b5, black rook h5, black pawn c7, black king h8; black to move.
+        var state = ChessState()
+        for (x in 0 until 8) for (y in 0 until 8) state.set(x, y, ChessState.EMPTY)
+        state.set(0, 4, ChessState.KING.toByte())
+        state.set(1, 4, ChessState.PAWN.toByte())
+        state.set(7, 4, (-ChessState.ROOK).toByte())
+        state.set(2, 6, (-ChessState.PAWN).toByte())
+        state.set(7, 7, (-ChessState.KING).toByte())
+        state.agentTurn = ChessState.TURN_BLACK
+        state.castlingRights = 0
+        state = play(simulator, state, ChessAction(2, 6, 2, 4)) // c7-c5
+        assertEquals(2, state.enPassantX)
+        // bxc6 e.p. would expose the white king along the 5th rank, so it is not legal.
+        assertFalse(simulator.calculateLegalActions(state)[0].contains(ChessAction(1, 4, 2, 5)))
+        val noEnPassant = state.copy()
+        noEnPassant.enPassantX = -1
+        assertEquals(simulator.positionKey(noEnPassant), simulator.positionKey(state))
     }
 
     @Test

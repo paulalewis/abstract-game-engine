@@ -292,19 +292,26 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
      */
     internal fun applyMove(state: ChessState, action: ChessAction): ChessState {
         val next = movePieces(state, action)
+        // A pawn move or capture (clock reset) makes earlier positions unreachable: leave it empty.
         if (next.halfmoveClock != 0) {
+            next.positionHistory.addAll(state.positionHistory)
             next.positionHistory.add(positionKey(state))
         }
         return next
     }
 
     /**
-     * Plays [action] on a copy of [state] without the repetition bookkeeping, which is all
-     * that legality checks need. The pawn move or capture case still clears
-     * [ChessState.positionHistory], since those positions can no longer recur.
+     * Plays [action] on a copy of [state] with an empty [ChessState.positionHistory], which is
+     * all that legality checks need. [applyMove] fills in the history for real transitions.
      */
     private fun movePieces(state: ChessState, action: ChessAction): ChessState {
-        val next = state.copy()
+        val next = ChessState(
+            Array(ChessState.SIZE) { state.board[it].copyOf() },
+            state.agentTurn,
+            state.castlingRights,
+            state.enPassantX,
+            state.halfmoveClock
+        )
         val turn = next.agentTurn.toInt()
         val piece = next.get(action.fromX, action.fromY)
         var captured = next.get(action.toX, action.toY)
@@ -363,7 +370,6 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
 
         if (ChessState.type(piece) == ChessState.PAWN || captured != ChessState.EMPTY) {
             next.halfmoveClock = 0
-            next.positionHistory.clear()
         } else {
             next.halfmoveClock += 1
         }
