@@ -54,10 +54,29 @@ class HexSimulator(
         return legalActions
     }
 
+    /**
+     * Checks the cell of [action] alone instead of building the set of every legal
+     * cell as in [calculateLegalActions]. The game-over check still runs, last.
+     */
+    override fun isLegalAction(state: HexState, agentTurn: Int, action: HexAction): Boolean {
+        if (agentTurn != state.agentTurn.toInt()) {
+            return false
+        }
+        // Actions are built from Int indices with toByte(), so read them back unsigned.
+        val x = action.x.toInt() and BYTE_MASK
+        val y = action.y.toInt() and BYTE_MASK
+        if (x >= state.boardSize || y >= state.boardSize) {
+            return false
+        }
+        if (!state.isLocationEmpty(x, y) && !(pieRule && isSecondMove(state))) {
+            return false
+        }
+        return calculateRewards(state).contentEquals(AdversarialRewards.neutral())
+    }
+
     override fun stateTransition(state: HexState, actions: List<HexAction?>): HexState {
         val agentTurn = state.agentTurn.toInt()
-        val legalActions = calculateLegalActions(state)
-        val action = requireLegalAction(actions, agentTurn, legalActions[agentTurn], state)
+        val action = requireLegalAction(actions, agentTurn, state) { isLegalAction(state, agentTurn, it) }
         val x = action.x.toInt()
         val y = action.y.toInt()
         val nextState = state.copy()
@@ -78,6 +97,7 @@ class HexSimulator(
         private const val NUMBER_OF_PLAYERS = 2
         private const val MIN_BOARD_SIZE = 3
         private const val MAX_BOARD_SIZE = 255
+        private const val BYTE_MASK = 0xFF
 
         private fun dfsSides(
             x0: Int,
