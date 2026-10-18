@@ -117,7 +117,7 @@ data class HexState(
 
     override fun hashCode(): Int {
         var hashCode = 17 + boardSize
-        hashCode = hashCode * 19 + bitBoards.contentHashCode()
+        hashCode = hashCode * 19 + bitBoards.contentDeepHashCode()
         hashCode = hashCode * 31 + agentTurn
         return hashCode
     }

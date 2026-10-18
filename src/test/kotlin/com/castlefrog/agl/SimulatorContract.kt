@@ -14,6 +14,7 @@ import kotlin.random.Random
  * - [Simulator.stateTransition] never mutates its input
  * - [State.copy] is a deep copy sufficient for isolation
  * - [Simulator.isLegalAction] agrees with [Simulator.calculateLegalActions]
+ * - equal states have equal hash codes
  */
 object SimulatorContract {
 
@@ -140,8 +141,55 @@ object SimulatorContract {
     }
 
     /**
-     * Runs transition non-mutation, deep-copy isolation, and [Simulator.isLegalAction]
-     * agreement for a domain fixture.
+     * Equal states must have equal hash codes. Plays [playouts] random playouts from
+     * [Simulator.initialState], then replays each playout's actions from a fresh initial
+     * state. Every state must hash like its [State.copy] and like the state the replay
+     * reaches by the same actions.
+     */
+    fun <S : State<S>, A : Action> assertEqualStatesHaveEqualHashCodes(
+        simulator: Simulator<S, A>,
+        random: Random = Random(0),
+        playouts: Int = 3,
+        maxSteps: Int = 80
+    ) {
+        repeat(playouts) {
+            val states = ArrayList<S>()
+            val actionsTaken = ArrayList<List<A?>>()
+            var state = simulator.initialState
+            for (step in 0..maxSteps) {
+                states.add(state)
+                val legalActions = simulator.calculateLegalActions(state)
+                val playerId = legalActions.indices.firstOrNull { legalActions[it].isNotEmpty() } ?: break
+                val action = legalActions[playerId].random(random)
+                val actions = List(simulator.numberOfPlayers()) { if (it == playerId) action else null }
+                actionsTaken.add(actions)
+                state = simulator.stateTransition(state, actions)
+            }
+            var replayed = simulator.initialState
+            for ((step, original) in states.withIndex()) {
+                val copy = original.copy()
+                assertEquals("copy must equal original at step $step", original, copy)
+                assertEquals(
+                    "a state and its copy must have equal hash codes at step $step: $original",
+                    original.hashCode(),
+                    copy.hashCode()
+                )
+                assertEquals("replay by the same actions must reach an equal state at step $step", original, replayed)
+                assertEquals(
+                    "states reached by the same actions must have equal hash codes at step $step: $original",
+                    original.hashCode(),
+                    replayed.hashCode()
+                )
+                if (step < actionsTaken.size) {
+                    replayed = simulator.stateTransition(replayed, actionsTaken[step])
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs transition non-mutation, deep-copy isolation, [Simulator.isLegalAction]
+     * agreement, and hash-code consistency for a domain fixture.
      */
     fun <S : State<S>, A : Action> assertDomainContracts(
         simulator: Simulator<S, A>,
@@ -155,5 +203,6 @@ object SimulatorContract {
         assertStateTransitionDoesNotMutateInput(simulator, state)
         assertCopyIsDeep(state, mutateNested)
         assertIsLegalActionAgreesWithLegalActions(simulator)
+        assertEqualStatesHaveEqualHashCodes(simulator)
     }
 }

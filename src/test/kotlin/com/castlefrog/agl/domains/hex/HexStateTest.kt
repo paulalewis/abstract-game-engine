@@ -51,6 +51,32 @@ class HexStateTest {
     }
 
     @Test
+    fun copyHasEqualHashCode() {
+        assertEquals(hexState.hashCode(), hexState.copy().hashCode())
+    }
+
+    @Test
+    fun statesBuiltBySameMovesHaveEqualHashCodes() {
+        val simulator = HexSimulator(boardSize = 5)
+        val moves = listOf(HexAction(2, 2), HexAction(1, 3), HexAction(0, 4))
+        fun play(): HexState = moves.foldIndexed(simulator.initialState) { i, state, move ->
+            simulator.stateTransition(state, if (i % 2 == 0) listOf(move, null) else listOf(null, move))
+        }
+        val first = play()
+        val second = play()
+        assertEquals(first, second)
+        assertEquals(first.hashCode(), second.hashCode())
+    }
+
+    @Test
+    fun equalStatesWorkInHashSetAndHashMap() {
+        val copy = hexState.copy()
+        assertTrue(copy in hashSetOf(hexState))
+        assertEquals(1, hashSetOf(hexState, copy).size)
+        assertEquals("value", hashMapOf(hexState to "value")[copy])
+    }
+
+    @Test
     fun testEqualityNotEqual() {
         val otherHexState = HexState(boardSize = 4)
         otherHexState.setLocation(2, 1, HexState.LOCATION_BLACK)

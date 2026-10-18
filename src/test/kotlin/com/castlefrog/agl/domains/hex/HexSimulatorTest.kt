@@ -10,6 +10,20 @@ import org.junit.Test
 class HexSimulatorTest {
 
     @Test
+    fun largestBoardSizeIsAccepted() {
+        val simulator = HexSimulator(boardSize = 128)
+        val farCorner = HexAction(127, 127)
+        assertTrue(simulator.isLegalAction(simulator.initialState, 0, farCorner))
+        val state = simulator.stateTransition(simulator.initialState, listOf(farCorner, null))
+        assertEquals(HexState.LOCATION_BLACK, state.getLocation(127, 127))
+    }
+
+    @Test
+    fun boardSizeOnePastLargestIsRejected() {
+        assertThrows(IllegalArgumentException::class.java) { HexSimulator(boardSize = 129) }
+    }
+
+    @Test
     fun stateTransitionEmptyActionsList() {
         val simulator = HexSimulator(boardSize = 5)
         assertThrows(IllegalActionException::class.java) {

@@ -10,13 +10,13 @@ class HexSimulator(
     private val pieRule: Boolean = true
 ) : Simulator<HexState, HexAction> {
 
-    private val actions = HexAction.generateActions(boardSize)
-
     init {
-        if (boardSize !in MIN_BOARD_SIZE until MAX_BOARD_SIZE) {
+        if (boardSize !in MIN_BOARD_SIZE..MAX_BOARD_SIZE) {
             throw IllegalArgumentException("Invalid board size: $boardSize")
         }
     }
+
+    private val actions = HexAction.generateActions(boardSize)
 
     override val initialState: HexState
         get() = HexState(boardSize = boardSize)
@@ -62,10 +62,9 @@ class HexSimulator(
         if (agentTurn != state.agentTurn.toInt()) {
             return false
         }
-        // Actions are built from Int indices with toByte(), so read them back unsigned.
-        val x = action.x.toInt() and BYTE_MASK
-        val y = action.y.toInt() and BYTE_MASK
-        if (x >= state.boardSize || y >= state.boardSize) {
+        val x = action.x.toInt()
+        val y = action.y.toInt()
+        if (x !in 0 until state.boardSize || y !in 0 until state.boardSize) {
             return false
         }
         if (!state.isLocationEmpty(x, y) && !(pieRule && isSecondMove(state))) {
@@ -96,8 +95,8 @@ class HexSimulator(
     companion object {
         private const val NUMBER_OF_PLAYERS = 2
         private const val MIN_BOARD_SIZE = 3
-        private const val MAX_BOARD_SIZE = 255
-        private const val BYTE_MASK = 0xFF
+        /** Largest board whose coordinates (0 until size) fit in [HexAction]'s signed bytes. */
+        private const val MAX_BOARD_SIZE = Byte.MAX_VALUE + 1
 
         private fun dfsSides(
             x0: Int,

@@ -33,7 +33,7 @@ Gradle with the Kotlin DSL and the bundled wrapper. Kotlin version, JVM toolchai
 JUnit 4 via `kotlin-test-junit`, in `src/test/kotlin` mirroring the main packages.
 
 - Each domain has a `*SimulatorTest` for rules and a `*StateTest` for copy, equality, and formatting.
-- `SimulatorContract` holds the library-wide checks (no input mutation, deep copy, `isLegalAction` agreeing with `calculateLegalActions` over random playouts). `CrossDomainSimulatorContractTest` runs them against every domain.
+- `SimulatorContract` holds the library-wide checks (no input mutation, deep copy, `isLegalAction` agreeing with `calculateLegalActions` over random playouts, equal states hashing equally). `CrossDomainSimulatorContractTest` runs them against every domain.
 - `TestSimulator`, `TestState`, and `TestAction` are a minimal domain for testing core code.
 
 CI (`.github/workflows/test.yml`) runs `./gradlew test` on JDK 21 for every pull request and every push to `main`.

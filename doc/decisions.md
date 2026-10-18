@@ -44,6 +44,10 @@ Arrow and Google Truth were removed. The library ships with only the Kotlin stan
 
 These are the rule sets the domains implement. Both Go rule sets score by area, so no agreement about dead stones is needed, and both use positional superko for the Chinese rule against repeating a position. They differ only in self-capture, which Chinese rules forbid. Tromp–Taylor stays the default so existing callers keep the same legal moves and results; apps that want Chinese rules pass `GoRules.CHINESE`.
 
+## Hex and Havannah boards are capped at byte coordinates
+
+`HexAction` and `HavannahAction` store coordinates as signed `Byte`s to keep actions small, so a coordinate above 127 would wrap negative. Hex boards are capped at 128 and Havannah bases at 64 (127 cells wide), and larger sizes are rejected. Real boards are far smaller. Raising a cap means widening the action coordinates first.
+
 ## Havannah finds rings in two passes
 
 A ring may enclose empty cells, the opponent's stones, or the player's own stones. The first pass flood-fills everything that is not the mover's stone and looks for an area touching no edge; it finds any ring whose inside holds at least one cell that is not the mover's. The second pass finds the rest: if every enclosed cell is the mover's, each of them has six neighbours of the mover's colour, which is itself a ring. Flood-filling around each connected group of the mover's stones does not work, because an own stone inside a ring touches the ring and joins its group, leaving nothing enclosed.
