@@ -10,6 +10,12 @@ class HavannahSimulator(
     val pieRule: Boolean = true
 ) : Simulator<HavannahState, HavannahAction> {
 
+    init {
+        if (base !in MIN_BASE..MAX_BASE) {
+            throw IllegalArgumentException("Invalid board size: $base")
+        }
+    }
+
     private val size = 2 * base - 1
     private val actions: Array<Array<HavannahAction>> = HavannahAction.generateActions(size)
 
@@ -38,12 +44,6 @@ class HavannahSimulator(
             }
             return sides
         }
-
-    init {
-        if (base < MIN_BASE) {
-            throw IllegalArgumentException("Invalid board size: $base")
-        }
-    }
 
     override val initialState: HavannahState
         get() = HavannahState(base, Array(2 * base - 1) { ByteArray(2 * base - 1) }, HavannahState.TURN_BLACK)
@@ -223,8 +223,10 @@ class HavannahSimulator(
     }
 
     companion object {
-        private const val MIN_BASE = 2
         private const val NUMBER_OF_PLAYERS = 2
+        private const val MIN_BASE = 2
+        /** Largest base whose coordinates (0 until 2 * base - 1) fit in [HavannahAction]'s signed bytes. */
+        private const val MAX_BASE = (Byte.MAX_VALUE + 2) / 2
 
         private fun dfsCornersSides(
             x0: Int,

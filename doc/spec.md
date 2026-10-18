@@ -16,7 +16,7 @@ The engine is a Kotlin library. It defines game domains (simulators) and agents 
 - `Simulator<S, A>` — rules of one domain. Actions are passed as a list with one entry per player; `null` means that player takes no action. Legal actions come back the same way, one set per player.
 - `Simulator.isLegalAction(state, agentTurn, action)` — whether one action is legal for a player. It always agrees with `calculateLegalActions`.
 - `requireLegalAction` — the check simulators run in `stateTransition`. It takes either the player's set of legal actions or a predicate such as `isLegalAction`, and throws `IllegalActionException` with the same messages either way.
-- `State<S>` — a domain state with a deep `copy()`.
+- `State<S>` — a domain state with a deep `copy()`. Equal states have equal hash codes, so states work as `HashSet` members and `HashMap` keys.
 - `Action` — marker for a domain move. Actions are immutable and compare by value.
 - `Agent` — picks an action for a player from a state, or `null` if it has none.
 - `History<A>` — records the actions taken at each step, root first. It stores actions, not states.
@@ -37,8 +37,8 @@ All domains are two-player and zero-sum. Player 0 moves first.
 | Connect 4 | 7 wide, 6 high. Four in a row in any direction wins. | none |
 | Draughts | International draughts on 10×10. Captures are mandatory and the longest sequence must be taken; kings fly. A multi-jump is several actions by the same player but one move. A player with no moves loses. Automatic draws (FMJD article 6): threefold repetition with the same player to move, 25 king moves each without a capture, and the endgame limits against a lone king (16 moves each when the other side has three pieces including a king, 5 moves each when it has one or two pieces including a king, counted from when that material is reached). The no-move loss is checked first. | none |
 | Go | Positional superko, two passes end the game, area scoring (stones plus territory, komi to white). Two rule sets differ only in self-capture: Tromp–Taylor allows it if the position is new, and the mover's group is removed; Chinese forbids it, so a play must leave its own group a liberty after opponent captures. Player 0 is black. | board size, komi, rules (default 19, 7 and Tromp–Taylor) |
-| Havannah | Hexagonal board. Win by a ring (a loop of stones around one or more cells, whatever they hold, including the player's own stones), a bridge (two corners), or a fork (three sides). Only the player who just moved is checked for a ring. | base, pie rule (default 10 and on) |
-| Hex | Rhombus board. Player 0 connects one pair of sides, player 1 the other. | board size, pie rule (default 11 and on) |
+| Havannah | Hexagonal board. Win by a ring (a loop of stones around one or more cells, whatever they hold, including the player's own stones), a bridge (two corners), or a fork (three sides). Only the player who just moved is checked for a ring. | base 2 to 64, pie rule (default 10 and on) |
+| Hex | Rhombus board. Player 0 connects one pair of sides, player 1 the other. | board size 3 to 128, pie rule (default 11 and on) |
 
 Not implemented: chess draws by insufficient material.
 

@@ -11,6 +11,20 @@ import org.junit.Test
 class HavannahSimulatorTest {
 
     @Test
+    fun largestBaseIsAccepted() {
+        val simulator = HavannahSimulator(base = 64)
+        val farCorner = HavannahAction(126, 126)
+        assertTrue(simulator.isLegalAction(simulator.initialState, 0, farCorner))
+        val state = simulator.stateTransition(simulator.initialState, listOf(farCorner, null))
+        assertEquals(HavannahState.LOCATION_BLACK, state.locations[126][126])
+    }
+
+    @Test
+    fun baseOnePastLargestIsRejected() {
+        assertThrows(IllegalArgumentException::class.java) { HavannahSimulator(base = 65) }
+    }
+
+    @Test
     fun stateTransitionEmptyActionsList() {
         val simulator = HavannahSimulator(5)
         assertThrows(IllegalActionException::class.java) {
