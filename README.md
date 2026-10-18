@@ -25,14 +25,8 @@ Agents:
 
 ## Setup
 
-1. Install a JDK 21+ (for example via Homebrew: `brew install openjdk@21`)
-2. The Gradle wrapper is included; no separate Gradle install is required
-
-Point `JAVA_HOME` at JDK 21 if needed:
-
-```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-```
+1. Install JDK 21. The build compiles and tests with a JDK 21 toolchain, and Gradle finds an installed JDK 21 by itself.
+2. The Gradle wrapper is included; no separate Gradle install is required. It runs on any Java from 17 up, so `JAVA_HOME` can stay on a newer JDK.
 
 ## Build
 
