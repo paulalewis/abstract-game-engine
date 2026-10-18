@@ -12,7 +12,7 @@ class HavannahSimulator(
 
     init {
         if (base !in MIN_BASE..MAX_BASE) {
-            throw IllegalArgumentException("Invalid board size: $base")
+            throw IllegalArgumentException("Invalid base: $base")
         }
     }
 
