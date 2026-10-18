@@ -1,1 +1,1 @@
-rootProject.name = "kotlin-age"
+rootProject.name = "abstract-games-engine"
