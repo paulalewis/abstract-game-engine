@@ -60,6 +60,14 @@ Chess's fifty-move rule and threefold repetition, and the draughts draw rules, e
 
 Draughts and chess repetition need earlier positions. They are kept in `DraughtsState` and `ChessState`, reset by any man or pawn move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."
 
+## MCTS weakens low levels with a temperature over visit counts
+
+A small search budget alone does not make a weak player that feels human: with few playouts the visit counts are noisy, and the agent makes odd moves while still never missing some tactics. Low `MctsLevel`s instead pick the final move with probability proportional to `visits^(1/temperature)`, a softmax over log visit counts. Moves the search likes are still the likeliest, so the agent plays plausible moves and makes plausible mistakes; temperature 0 is the usual most-visited move. The alternative, sometimes playing a random move, was rejected because a random move in a board game is often absurd. The level presets may be retuned, but keep the weakening in the final move choice, not in the search.
+
+## MCTS playouts are capped and score neutral at the cap
+
+Random Go games may not end, and long random games in any domain cost time without telling the search much. A playout stops after `MctsConfig.maxPlayoutLength` steps and is scored by the `StateEvaluator` if there is one, otherwise as 0 for every player, the draw reward. A neutral score adds no bias toward either side; it only dilutes the estimate. Domains where random playouts are poor, such as Go, should supply a playout policy or evaluator rather than rely on the cap.
+
 ## Random Go playouts stop by not filling own eyes
 
 Uniform random Go never ends: players fill their own eyes, groups die, and the board refills. In a playout the mover picks uniformly among legal placements that do not fill one of its own single-point eyes, and passes only when none is left. An eye is an empty point whose on-board orthogonal neighbours are all the mover's stones, with at most one opponent stone on its diagonals in the middle of the board and none on the edge or in a corner. The diagonal test leaves false eyes fillable, so a group that needs that point to connect can still be saved. A cap of three plies per board point backs this up. Two passes then end the game by the normal rules. The benchmark's `GoPlayoutPolicy` implements this; the playout policies for MCTS reuse the same rule. Do not drop the diagonal test or let random play pass early to make games shorter.
