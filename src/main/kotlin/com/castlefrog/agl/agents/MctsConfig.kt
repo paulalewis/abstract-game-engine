@@ -12,9 +12,10 @@ import kotlin.time.Duration
  * @property iterations the most search iterations per move (one playout each), or null
  *           for no iteration limit
  * @property timeLimit the most time to search per move, or null for no time limit
- * @property explorationConstant the UCB1 constant `c` in `mean + c * sqrt(ln N / n)`.
- *           The default suits rewards between -1 and 1, the scale every built-in domain
- *           uses.
+ * @property explorationConstant the UCB1 constant `c` in `mean + c * sqrt(ln N / n)`,
+ *           on the scale of the rewards. The default √2 is for rewards between -1 and 1,
+ *           the scale every built-in domain uses; there it is equivalent to about 0.71 on
+ *           a 0 to 1 scale.
  * @property temperature how the final move is chosen from the root's visit counts. 0
  *           plays the most visited move. Above 0 a move is drawn with probability
  *           proportional to `visits^(1 / temperature)`, a softmax over log visit counts:

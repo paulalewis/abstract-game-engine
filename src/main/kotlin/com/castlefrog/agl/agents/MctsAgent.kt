@@ -142,6 +142,9 @@ class MctsAgent(
             private set
         private var playerCount = 0
         var count = 0
+
+        /** The rewards of a terminal node, computed on its first visit. */
+        var terminalRewards: DoubleArray? = null
         val children = HashMap<List<A?>, Node<S, A>>()
 
         val isTerminal: Boolean get() = movers.isEmpty()
@@ -179,7 +182,7 @@ class MctsAgent(
                     node.expand(simulator.calculateLegalActions(node.state), random)
                 }
                 if (node.isTerminal) {
-                    rewards = terminalRewards(node.state)
+                    rewards = node.terminalRewards ?: terminalRewards(node.state).also { node.terminalRewards = it }
                     break
                 }
                 val choice = select(node)

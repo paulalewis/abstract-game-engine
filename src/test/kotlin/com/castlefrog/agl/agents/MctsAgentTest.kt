@@ -371,6 +371,27 @@ class MctsAgentTest {
     }
 
     @Test
+    fun terminalNodeRewardsAreComputedOnce() {
+        // A one-move game: both children of the root are terminal and revisited often.
+        var rewardCalls = 0
+        val actions = setOf(TestAction(1), TestAction(2))
+        val simulator = object : Simulator<TestState, TestAction> {
+            override val initialState = TestState(0)
+            override fun calculateRewards(state: TestState): IntArray {
+                rewardCalls++
+                return intArrayOf(if (state.value == 2) 1 else -1)
+            }
+            override fun calculateLegalActions(state: TestState) = listOf(if (state.value == 0) actions else emptySet())
+            override fun stateTransition(state: TestState, actions: List<TestAction?>) = TestState(actions[0]!!.value)
+            override fun numberOfPlayers() = 1
+        }
+        val result = MctsAgent(MctsConfig(iterations = 40), Random(21)).search(0, simulator.initialState, simulator)
+        assertEquals(TestAction(2), result.action)
+        // One call from each child's first playout and one when each is first revisited.
+        assertTrue("$rewardCalls calls", rewardCalls <= 4)
+    }
+
+    @Test
     fun configRejectsInvalidSettings() {
         assertThrows(IllegalArgumentException::class.java) { MctsConfig(iterations = null, timeLimit = null) }
         assertThrows(IllegalArgumentException::class.java) { MctsConfig(iterations = 0) }

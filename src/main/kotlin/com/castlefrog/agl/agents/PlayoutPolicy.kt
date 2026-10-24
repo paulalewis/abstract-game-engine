@@ -17,9 +17,17 @@ interface PlayoutPolicy {
      *
      * The agent does not compute legal actions for playout states; the policy decides
      * how. A policy may call [Simulator.calculateLegalActions] once, or, where that is
-     * costly, pick a candidate move and check it with [Simulator.isLegalAction]. It
-     * must return null exactly when no player has a legal action, as
-     * [Simulator.isTerminalState] defines.
+     * costly, pick a candidate move and check it with [Simulator.isLegalAction].
+     *
+     * It must return null only when [state] is truly terminal, meaning no player has a
+     * legal action, as [Simulator.isTerminalState] defines. The agent then scores the
+     * playout with [Simulator.calculateRewards], so a null for an unfinished game would
+     * score it as if it had ended. A policy that wants to stop a playout early must use
+     * a [StateEvaluator] instead.
+     *
+     * The returned list is passed straight to [Simulator.stateTransition], which throws
+     * [com.castlefrog.agl.IllegalActionException] if its shape is wrong, such as the wrong
+     * length or a null for the player to move, or if an action is illegal.
      *
      * @param state the playout's current state
      * @param simulator the domain's rules
