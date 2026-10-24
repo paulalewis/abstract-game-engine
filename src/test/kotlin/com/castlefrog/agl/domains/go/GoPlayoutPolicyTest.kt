@@ -158,7 +158,8 @@ class GoPlayoutPolicyTest {
     @Test
     fun fastLegalityCheckAgreesOnKoSuicideAndSelfCaptureFixtures() {
         val fixtures = listOf(
-            // One-stone ko after black takes: white may not retake at (1,1).
+            // The position just after black takes a one-stone ko, with no history: here the
+            // retake at (1,1) is legal. A real ko is in koRetakeFollowsPositionalSuperko.
             board(
                 ". . . .",
                 ". X O .",
@@ -213,14 +214,21 @@ class GoPlayoutPolicyTest {
 
     @Test
     fun aGroupWithNoLibertyFallsBackToTheSimulator() {
-        // Not reachable in play: the white stone at (0,0) has no liberty.
+        // Not reachable in play: the white stone at (0,0) has no liberty. Black at (2,0)
+        // leaves black's group no liberty, but the simulator first clears the dead white
+        // stone, which gives it one, so the move is legal even under Chinese rules.
         val state = board(
-            ". . .",
-            "X . .",
-            "O X ."
+            ". . . . .",
+            ". . . . .",
+            "O O . . .",
+            "X X O . .",
+            "O X . O ."
         )
+        val simulator = GoSimulator(boardSize = 5, rules = GoRules.CHINESE)
+        assertTrue(simulator.isLegalAction(state, 0, GoAction.place(2, 0)))
+        assertTrue(GoBoard(state, simulator).isLegal(2 * 5 + 0))
         for (rules in GoRules.entries) {
-            assertAgreesWithSimulator(GoSimulator(boardSize = 3, rules = rules), state)
+            assertAgreesWithSimulator(GoSimulator(boardSize = 5, rules = rules), state)
         }
     }
 

@@ -37,15 +37,17 @@ class HexPlayoutPolicyTest {
 
     @Test
     fun playsEveryEmptyCellUniformly() {
+        // Two stones, so the policy samples empty cells itself rather than deferring.
         val simulator = HexSimulator(boardSize = 3, pieRule = false)
-        val state = simulator.stateTransition(simulator.initialState, listOf(HexAction(1, 1), null))
+        var state = simulator.stateTransition(simulator.initialState, listOf(HexAction(1, 1), null))
+        state = simulator.stateTransition(state, listOf(null, HexAction(0, 0)))
         val random = Random(4)
         val counts = HashMap<HexAction, Int>()
-        repeat(8000) {
-            val action = HexPlayoutPolicy.selectActions(state, simulator, random)!![1]!!
+        repeat(7000) {
+            val action = HexPlayoutPolicy.selectActions(state, simulator, random)!![0]!!
             counts[action] = (counts[action] ?: 0) + 1
         }
-        assertEquals(simulator.calculateLegalActions(state)[1], counts.keys)
+        assertEquals(simulator.calculateLegalActions(state)[0], counts.keys)
         assertTrue("$counts", counts.values.all { it in 800..1200 })
     }
 

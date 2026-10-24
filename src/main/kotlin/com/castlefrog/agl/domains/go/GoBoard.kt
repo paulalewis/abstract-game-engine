@@ -29,6 +29,9 @@ internal class GoBoard(private val state: GoState, private val simulator: GoSimu
     private var groupCount = 0
     private var hasGroupWithoutLiberty = false
 
+    /** Scratch space for [isLegal], so a candidate check allocates only the result board. */
+    private val isLegalNeighbours = IntArray(4)
+
     private val empties = IntArray(cells.size)
     private var emptyCount = 0
 
@@ -128,7 +131,7 @@ internal class GoBoard(private val state: GoState, private val simulator: GoSimu
         if (hasGroupWithoutLiberty) {
             return simulator.isLegalAction(state, turn, GoAction.place(p / n, p % n))
         }
-        val neighbours = IntArray(4)
+        val neighbours = isLegalNeighbours
         val count = neighbours(p, neighbours)
         var captures = false
         var hasLiberty = false
