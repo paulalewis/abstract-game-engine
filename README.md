@@ -61,3 +61,13 @@ HTML report (after a test run):
 ```text
 build/reports/tests/test/index.html
 ```
+
+## Benchmark random playouts
+
+```bash
+./gradlew benchmark
+# one domain, fewer games
+./gradlew benchmark --args="--only go19 --games-scale 0.2"
+```
+
+It plays random games in every domain with a fixed seed and prints games per second, moves per second, and where the time goes. See [doc/architecture.md](doc/architecture.md#benchmark).

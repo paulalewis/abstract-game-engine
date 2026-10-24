@@ -36,4 +36,8 @@ JUnit 4 via `kotlin-test-junit`, in `src/test/kotlin` mirroring the main package
 - `SimulatorContract` holds the library-wide checks (no input mutation, deep copy, `isLegalAction` agreeing with `calculateLegalActions` over random playouts, equal states hashing equally). `CrossDomainSimulatorContractTest` runs them against every domain.
 - `TestSimulator`, `TestState`, and `TestAction` are a minimal domain for testing core code.
 
-CI (`.github/workflows/test.yml`) runs `./gradlew test` on JDK 21 for every pull request and every push to `main`.
+## Benchmark
+
+`src/benchmark/kotlin` is its own Gradle source set, `benchmark`, that depends on the main output. It is not in the library JAR and `./gradlew test` does not run it; `./gradlew check` and `build` only compile it. `./gradlew benchmark` plays random games from the initial state to the end in each domain and size it lists, with a fixed seed, and prints games per second, moves per second, and the share of time in `calculateLegalActions`, `stateTransition`, `isTerminalState`, `calculateRewards`, and the move choice. `--args` takes `--only`, `--games-scale`, and `--seed`; see `PlayoutBenchmark.kt`. Go games use `GoPlayoutPolicy`, the stopping rule in [decisions.md](decisions.md).
+
+CI (`.github/workflows/test.yml`) runs `./gradlew check` (tests, and compiling the benchmark) on JDK 21 for every pull request and every push to `main`.
