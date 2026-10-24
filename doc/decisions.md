@@ -59,3 +59,11 @@ Chess's fifty-move rule and threefold repetition, and the draughts draw rules, e
 ## Draw history lives in the state
 
 Draughts and chess repetition need earlier positions. They are kept in `DraughtsState` and `ChessState`, reset by any man or pawn move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."
+
+## Random Go playouts stop by not filling own eyes
+
+Uniform random Go never ends: players fill their own eyes, groups die, and the board refills. In a playout the mover picks uniformly among legal placements that do not fill one of its own single-point eyes, and passes only when none is left. An eye is an empty point whose on-board orthogonal neighbours are all the mover's stones, with at most one opponent stone on its diagonals in the middle of the board and none on the edge or in a corner. The diagonal test leaves false eyes fillable, so a group that needs that point to connect can still be saved. A cap of three plies per board point backs this up. Two passes then end the game by the normal rules. The benchmark's `GoPlayoutPolicy` implements this; the playout policies for MCTS reuse the same rule. Do not drop the diagonal test or let random play pass early to make games shorter.
+
+## The benchmark is a source set, not a test
+
+Timings vary by machine and load, so they cannot be test assertions, and a run takes about 40 seconds. Keeping the benchmark in its own source set keeps it out of the JAR and the test run while `build` still compiles it against the current API.
