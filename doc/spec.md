@@ -47,6 +47,12 @@ Domain rules and options may be revised.
 ## Agents
 
 - `RandomAgent` — picks a legal action uniformly at random. Takes an optional `Random` for reproducible play.
+- `MctsAgent` — Monte Carlo Tree Search (UCT) for any domain, using only `Simulator`. Each player's statistics hold that player's own reward from `calculateRewards`, so it handles any number of players. Settings are an `MctsConfig`:
+  - Budget: an iteration count, a time limit, or both; the search stops at the first reached. `search(playerId, state, simulator, shouldStop)` also stops when `shouldStop` returns true or the thread is interrupted, and still returns its best move so far. It returns an `MctsResult` with the move, the iterations run, and the root visit counts. A player with one legal action gets it without a search.
+  - Strength: the budget, plus `temperature` for the final move: 0 plays the most visited move, above 0 draws a move with probability proportional to `visits^(1/temperature)`. `MctsLevel` gives five presets, `BEGINNER` to `EXPERT`.
+  - Hooks: a `PlayoutPolicy` picks playout moves and reports when a playout state is terminal (default `UniformRandomPlayoutPolicy`); the agent computes no legal actions for playout states itself, so a policy can avoid full legal-move generation. An optional `StateEvaluator` can end a playout with estimated rewards. Tree nodes compute their legal actions when first chosen from, not when added.
+  - Playout cap: a playout stops after `maxPlayoutLength` steps. It is then scored by the evaluator if there is one, and otherwise as neutral, 0 for every player.
+  - Takes a `Random`; a seeded agent repeats its moves. The search tree is local to each call, so a call can run on a background thread; one instance should not run two searches at once with a seeded `Random`.
 
 ## Non-goals
 

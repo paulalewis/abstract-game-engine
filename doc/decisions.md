@@ -59,3 +59,11 @@ Chess's fifty-move rule and threefold repetition, and the draughts draw rules, e
 ## Draw history lives in the state
 
 Draughts and chess repetition need earlier positions. They are kept in `DraughtsState` and `ChessState`, reset by any man or pawn move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."
+
+## MCTS weakens low levels with a temperature over visit counts
+
+A small search budget alone does not make a weak player that feels human: with few playouts the visit counts are noisy, and the agent makes odd moves while still never missing some tactics. Low `MctsLevel`s instead pick the final move with probability proportional to `visits^(1/temperature)`, a softmax over log visit counts. Moves the search likes are still the likeliest, so the agent plays plausible moves and makes plausible mistakes; temperature 0 is the usual most-visited move. The alternative, sometimes playing a random move, was rejected because a random move in a board game is often absurd. The level presets may be retuned, but keep the weakening in the final move choice, not in the search.
+
+## MCTS playouts are capped and score neutral at the cap
+
+Random Go games may not end, and long random games in any domain cost time without telling the search much. A playout stops after `MctsConfig.maxPlayoutLength` steps and is scored by the `StateEvaluator` if there is one, otherwise as 0 for every player, the draw reward. A neutral score adds no bias toward either side; it only dilutes the estimate. Domains where random playouts are poor, such as Go, should supply a playout policy or evaluator rather than rely on the cap.

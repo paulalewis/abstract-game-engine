@@ -8,7 +8,7 @@ Everything is under `src/main/kotlin/com/castlefrog/agl`.
 
 - **Core** (`com.castlefrog.agl`) — the interfaces `Simulator`, `State`, `Action`, `Agent`, plus `History`, `IllegalActionException`, and `requireLegalAction`, which every simulator calls to validate its actions list.
 - **util** — extension helpers on `LegalActions` (a `List<Set<A>>`).
-- **agents** — `Agent` implementations. Depend only on core and util.
+- **agents** — `Agent` implementations. Depend only on core and util. `MctsAgent` is configured by `MctsConfig`, and takes its domain-specific hooks, `PlayoutPolicy` and `StateEvaluator`, as interfaces from this package so domain code can supply them without core depending on domains.
 - **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains.
 
 Dependencies point inward: domains and agents depend on core; core depends on nothing here.
