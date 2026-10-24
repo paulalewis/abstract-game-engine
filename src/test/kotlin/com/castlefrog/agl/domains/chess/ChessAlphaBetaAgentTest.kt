@@ -182,8 +182,11 @@ class ChessAlphaBetaAgentTest {
             fen("4k3/8/3p4/4p3/3Q4/8/8/4K3 w")
         )
         for (strength in ChessStrength.entries.take(3)) {
-            val first = positions.map { ChessAlphaBetaAgent(strength, Random(11)).search(it, simulator).move }
-            val second = positions.map { ChessAlphaBetaAgent(strength, Random(11)).search(it, simulator).move }
+            fun agent() = ChessAlphaBetaAgent(
+                strength.maxDepth, 0, strength.marginCentipawns, strength.temperatureCentipawns, Random(11)
+            )
+            val first = positions.map { agent().search(it, simulator).move }
+            val second = positions.map { agent().search(it, simulator).move }
             assertEquals(first, second)
         }
     }

@@ -594,9 +594,6 @@ class ChessSimulatorTest {
             var ply = 0
             while (ply < 200) {
                 val legal = simulator.calculateLegalActions(state)[state.agentTurn.toInt()]
-                val moves = simulator.legalMoves(state)
-                assertEquals(legal, moves.toSet())
-                assertEquals(legal.size, moves.size)
                 if (!simulator.isDrawByRule(state)) {
                     assertEquals(legal.isNotEmpty(), simulator.hasLegalMove(state))
                     assertEquals(

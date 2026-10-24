@@ -12,7 +12,8 @@ import kotlin.random.Random
  * a quiescence search over captures and promotions at the leaves.
  *
  * Moves are ordered with the previous iteration's best move first at the root, then captures
- * by most valuable victim and least valuable attacker (MVV-LVA), then promotions. Positions are
+ * by most valuable victim and least valuable attacker (MVV-LVA), then promotions, then two
+ * killer moves per ply (quiet moves that last caused a cutoff at that ply). Positions are
  * scored by material and piece-square tables. Checkmate, stalemate, the fifty-move rule and
  * threefold repetition are scored from [ChessSimulator.calculateRewards], so the agent agrees
  * with the rules: a win is worth more the sooner it comes, and a draw is worth 0.
@@ -201,11 +202,13 @@ class ChessAlphaBetaAgent(
                 if (qDepth >= MAX_QUIESCENCE_CHECK_DEPTH || ply >= MAX_PLY) return evaluate(state)
                 best = -INFINITY
             } else {
-                if (!simulator.hasLegalMove(state) || simulator.isDrawByRule(state)) return terminalScore(state, ply)
+                if (simulator.isDrawByRule(state)) return terminalScore(state, ply)
+                moves = simulator.legalCapturesAndPromotions(state)
+                // A legal capture means a legal move, so only test for stalemate without one.
+                if (moves.isEmpty() && !simulator.hasLegalMove(state)) return terminalScore(state, ply)
                 best = evaluate(state)
                 if (best >= beta || ply >= MAX_PLY) return best
                 if (best > a) a = best
-                moves = simulator.legalCapturesAndPromotions(state)
             }
             for (move in orderMoves(state, moves)) {
                 val score = -quiesce(simulator.applyMove(state, move), -beta, -a, ply + 1, qDepth + 1)
