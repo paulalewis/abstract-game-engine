@@ -9,7 +9,7 @@ Everything is under `src/main/kotlin/com/castlefrog/agl`.
 - **Core** (`com.castlefrog.agl`) — the interfaces `Simulator`, `State`, `Action`, `Agent`, plus `History`, `IllegalActionException`, and `requireLegalAction`, which every simulator calls to validate its actions list.
 - **util** — extension helpers on `LegalActions` (a `List<Set<A>>`).
 - **agents** — `Agent` implementations. Depend only on core and util. `MctsAgent` is configured by `MctsConfig`, and takes its domain-specific hooks, `PlayoutPolicy` and `StateEvaluator`, as interfaces from this package so domain code can supply them without core depending on domains.
-- **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains.
+- **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. A domain may also supply `MctsAgent` hooks (`PlayoutPolicy`, `StateEvaluator`), so domains may depend on `agents`; Go and Hex do. Go's policy checks a move with `GoBoard`, an internal one-pass map of the position's groups and liberties built per playout step. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains.
 
 Dependencies point inward: domains and agents depend on core; core depends on nothing here.
 
@@ -38,6 +38,6 @@ JUnit 4 via `kotlin-test-junit`, in `src/test/kotlin` mirroring the main package
 
 ## Benchmark
 
-`src/benchmark/kotlin` is its own Gradle source set, `benchmark`, that depends on the main output. It is not in the library JAR and `./gradlew test` does not run it; `./gradlew check` and `build` only compile it. `./gradlew benchmark` plays random games from the initial state to the end in each domain and size it lists, with a fixed seed, and prints games per second, moves per second, and the share of time in `calculateLegalActions`, `stateTransition`, `isTerminalState`, `calculateRewards`, and the move choice. `--args` takes `--only`, `--games-scale`, and `--seed`; see `PlayoutBenchmark.kt`. Go games use `GoPlayoutPolicy`, the stopping rule in [decisions.md](decisions.md).
+`src/benchmark/kotlin` is its own Gradle source set, `benchmark`, that depends on the main output. It is not in the library JAR and `./gradlew test` does not run it; `./gradlew check` and `build` only compile it. `./gradlew benchmark` plays random games from the initial state to the end in each domain and size it lists, with a fixed seed, and prints games per second, moves per second, and the share of time in `calculateLegalActions`, `stateTransition`, `isTerminalState`, `calculateRewards`, and the move choice. `--args` takes `--only`, `--games-scale`, `--seed` and `--mode`; see `PlayoutBenchmark.kt`. In the default `random` mode Go games pick from the full legal set by the stopping rule in [decisions.md](decisions.md). `--mode mcts` plays each case as an `MctsAgent` playout does, policy then transition, once with `UniformRandomPlayoutPolicy` and once with the domain's own policy and evaluator where it has them.
 
 CI (`.github/workflows/test.yml`) runs `./gradlew check` (tests, and compiling the benchmark) on JDK 21 for every pull request and every push to `main`.

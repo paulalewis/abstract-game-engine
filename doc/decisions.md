@@ -70,7 +70,15 @@ Random Go games may not end, and long random games in any domain cost time witho
 
 ## Random Go playouts stop by not filling own eyes
 
-Uniform random Go never ends: players fill their own eyes, groups die, and the board refills. In a playout the mover picks uniformly among legal placements that do not fill one of its own single-point eyes, and passes only when none is left. An eye is an empty point whose on-board orthogonal neighbours are all the mover's stones, with at most one opponent stone on its diagonals in the middle of the board and none on the edge or in a corner. The diagonal test leaves false eyes fillable, so a group that needs that point to connect can still be saved. A cap of three plies per board point backs this up. Two passes then end the game by the normal rules. The benchmark's `GoPlayoutPolicy` implements this; the playout policies for MCTS reuse the same rule. Do not drop the diagonal test or let random play pass early to make games shorter.
+Uniform random Go never ends: players fill their own eyes, groups die, and the board refills. In a playout the mover picks uniformly among legal placements that do not fill one of its own single-point eyes, and passes only when none is left. An eye is an empty point whose on-board orthogonal neighbours are all the mover's stones, with at most one opponent stone on its diagonals in the middle of the board and none on the edge or in a corner. The diagonal test leaves false eyes fillable, so a group that needs that point to connect can still be saved. A cap of three plies per board point backs this up. Two passes then end the game by the normal rules. `GoPlayoutPolicy` in `domains/go` implements it, and the benchmark uses its eye test. Do not drop the diagonal test or let random play pass early to make games shorter.
+
+## The Go playout policy checks legality itself
+
+`GoSimulator.isLegalAction` builds a trial board and scans the whole board twice for captures, which costs more than a playout can afford on every candidate. `GoPlayoutPolicy` instead maps the position's groups and liberties once per step and checks a candidate from the groups next to it, plus the positional superko scan. It must agree exactly with the simulator, superko and both self-capture rules included; `GoPlayoutPolicyTest` checks it at every point of many seeded positions, and `stateTransition` still validates each move. If a position has a group with no liberty, which play never produces, it asks the simulator instead. Do not replace this check with a heuristic that may let an illegal move through.
+
+## Playout policies only where the benchmark shows a gain
+
+`./gradlew benchmark --args="--mode mcts"` decides. Go gains 20 to 40 times and Hex about 3 times. A fast uniform Havannah policy gained about 6%, because its win check, run again in `stateTransition`, dominates, so there is none. Draughts must find every capture for the majority rule and Chess must generate moves to test check, so a policy would not avoid the legal-move work. Add one when a measurement shows it pays.
 
 ## The benchmark is a source set, not a test
 
