@@ -9,9 +9,9 @@ Everything is under `src/main/kotlin/com/castlefrog/agl`.
 - **Core** (`com.castlefrog.agl`) — the interfaces `Simulator`, `State`, `Action`, `Agent`, plus `History`, `IllegalActionException`, and `requireLegalAction`, which every simulator calls to validate its actions list.
 - **util** — extension helpers on `LegalActions` (a `List<Set<A>>`).
 - **agents** — `Agent` implementations. Depend only on core and util. `MctsAgent` is configured by `MctsConfig`, and takes its domain-specific hooks, `PlayoutPolicy` and `StateEvaluator`, as interfaces from this package so domain code can supply them without core depending on domains.
-- **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. A domain may also supply `MctsAgent` hooks (`PlayoutPolicy`, `StateEvaluator`), so domains may depend on `agents`; Go and Hex do. Go's policy checks a move with `GoBoard`, an internal one-pass map of the position's groups and liberties built per playout step. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains.
+- **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains. A domain may also hold its own agent, or `MctsAgent` hooks (`PlayoutPolicy`, `StateEvaluator`), so domains may depend on `agents`; Go and Hex have hooks. Go's policy checks a move with `GoBoard`, an internal one-pass map of the position's groups and liberties built per playout step.
 
-Dependencies point inward: domains and agents depend on core; core depends on nothing here.
+Dependencies point inward: domains and agents depend on core, and domains may depend on agents; core depends on nothing here.
 
 Data flow for one step: a caller asks the simulator for legal actions, an agent picks one, the caller builds a per-player actions list and calls `stateTransition`. The simulator validates the action for the player to move with `requireLegalAction`, copies the state, applies the move to the copy, and returns it. Rewards and terminality are computed from the state alone, with no cache.
 
@@ -23,6 +23,8 @@ Domain-specific state:
 - Go keeps the board colorings seen so far in the state for superko, and a pass counter.
 - Chess keeps castling rights, en-passant file, the halfmove clock, and the position keys seen since the last pawn move or capture (for threefold repetition) in the state.
 - Connect 4 and Hex use bit operations for win checks.
+
+Domain-specific agents live in their domain's package. `ChessAlphaBetaAgent` is in `domains/chess` so it can use the simulator's `internal` move helpers. `legalMoves` is the move list behind `calculateLegalActions`. `applyMove` plays a move already known to be legal, still on a copy. `hasLegalMove` generates the pseudo-legal moves and stops checking at the first legal one, and `legalCapturesAndPromotions` tests only captures and promotions for check. They skip the per-player sets and the second legality check in `stateTransition`.
 
 ## Build
 
