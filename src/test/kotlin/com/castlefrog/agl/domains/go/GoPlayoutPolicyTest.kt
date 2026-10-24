@@ -236,7 +236,7 @@ class GoPlayoutPolicyTest {
             ". X . . ."
         )
         repeat(10) { seed ->
-            assertEquals(GoAction.place(2, 1), GoPlayoutPolicy().selectAction(state, simulator, Random(seed)))
+            assertEquals(GoAction.place(2, 1), GoPlayoutPolicy(preferTactics = true).selectAction(state, simulator, Random(seed)))
         }
     }
 
@@ -252,7 +252,7 @@ class GoPlayoutPolicyTest {
             ". O . . ."
         )
         repeat(10) { seed ->
-            assertEquals(GoAction.place(2, 1), GoPlayoutPolicy().selectAction(state, simulator, Random(seed)))
+            assertEquals(GoAction.place(2, 1), GoPlayoutPolicy(preferTactics = true).selectAction(state, simulator, Random(seed)))
         }
     }
 
@@ -297,9 +297,11 @@ class GoPlayoutPolicyTest {
         for (rules in GoRules.entries) {
             for (size in listOf(5, 7, 9)) {
                 val simulator = GoSimulator(boardSize = size, rules = rules)
-                repeat(10) { seed ->
-                    val plies = playOut(simulator, GoPlayoutPolicy(), Random(seed)) { _, _ -> }
-                    assertTrue("$rules size $size seed $seed: $plies plies", plies < GoPlayoutPolicy.moveCap(size))
+                for (tactics in listOf(true, false)) {
+                    repeat(10) { seed ->
+                        val plies = playOut(simulator, GoPlayoutPolicy(tactics), Random(seed)) { _, _ -> }
+                        assertTrue("$rules size $size tactics $tactics seed $seed: $plies plies", plies < GoPlayoutPolicy.moveCap(size))
+                    }
                 }
             }
         }

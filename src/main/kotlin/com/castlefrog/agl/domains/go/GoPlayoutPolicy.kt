@@ -15,7 +15,7 @@ import kotlin.random.Random
  * an exact legality test that looks only at the groups next to the point, plus one
  * positional superko scan, instead of building a trial board.
  *
- * With [preferTactics] on, the mover first plays a legal capture of an opponent group in
+ * With [preferTactics] on (off by default; see doc/decisions.md), the mover first plays a legal capture of an opponent group in
  * atari if there is one, then a legal move that extends one of its own groups in atari to
  * at least two liberties, both picked at random. Every move it plays is legal by the
  * simulator's rules, whatever the order.
@@ -25,7 +25,7 @@ import kotlin.random.Random
  * It only works with a [GoSimulator] and [GoState]; any other domain throws
  * [IllegalArgumentException].
  */
-class GoPlayoutPolicy(val preferTactics: Boolean = true) : PlayoutPolicy {
+class GoPlayoutPolicy(val preferTactics: Boolean = false) : PlayoutPolicy {
 
     override fun <S : State<S>, A : Action> selectActions(
         state: S,

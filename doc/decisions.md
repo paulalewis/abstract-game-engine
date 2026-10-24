@@ -76,6 +76,10 @@ Uniform random Go never ends: players fill their own eyes, groups die, and the b
 
 `GoSimulator.isLegalAction` builds a trial board and scans the whole board twice for captures, which costs more than a playout can afford on every candidate. `GoPlayoutPolicy` instead maps the position's groups and liberties once per step and checks a candidate from the groups next to it, plus the positional superko scan. It must agree exactly with the simulator, superko and both self-capture rules included; `GoPlayoutPolicyTest` checks it at every point of many seeded positions, and `stateTransition` still validates each move. If a position has a group with no liberty, which play never produces, it asks the simulator instead. Do not replace this check with a heuristic that may let an illegal move through.
 
+## Go playout tactics are off by default
+
+`GoPlayoutPolicy(preferTactics = true)` captures groups in atari and extends its own first. In a 16-game 9×9 match between two 300-iteration MCTS agents, alternating colors, the tactical side won 6, so the bias did not show a gain at that budget. The default is the plain stopping rule. Turn it on by default only after a larger match shows it plays better.
+
 ## Playout policies only where the benchmark shows a gain
 
 `./gradlew benchmark --args="--mode mcts"` decides. Go gains 20 to 40 times and Hex about 3 times. A fast uniform Havannah policy gained about 6%, because its win check, run again in `stateTransition`, dominates, so there is none. Draughts must find every capture for the majority rule and Chess must generate moves to test check, so a policy would not avoid the legal-move work. Add one when a measurement shows it pays.
