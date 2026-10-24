@@ -66,4 +66,4 @@ Uniform random Go never ends: players fill their own eyes, groups die, and the b
 
 ## The benchmark is a source set, not a test
 
-Timings vary by machine and load, so they cannot be test assertions, and a run takes about a minute. Keeping the benchmark in its own source set keeps it out of the JAR and the test run while `build` still compiles it against the current API.
+Timings vary by machine and load, so they cannot be test assertions, and a run takes about 40 seconds. Keeping the benchmark in its own source set keeps it out of the JAR and the test run while `build` still compiles it against the current API.
