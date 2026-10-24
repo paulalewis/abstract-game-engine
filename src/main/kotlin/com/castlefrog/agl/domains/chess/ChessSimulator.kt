@@ -47,16 +47,50 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
 
     override fun calculateLegalActions(state: ChessState): List<Set<ChessAction>> {
         val legal = listOf(mutableSetOf<ChessAction>(), mutableSetOf())
+        legal[state.agentTurn.toInt()].addAll(legalMoves(state))
+        return legal
+    }
+
+    /**
+     * The legal moves of the side to move, in generation order, or an empty list when the game
+     * is over. The same set as `calculateLegalActions(state)[state.agentTurn]`, without building
+     * the per-player sets. Used by [ChessAlphaBetaAgent].
+     */
+    internal fun legalMoves(state: ChessState): List<ChessAction> {
         val moves = generateLegalActions(state)
         // Checkmate/stalemate first: mate ends the game immediately.
-        if (moves.isEmpty()) {
-            return legal
+        if (moves.isEmpty() || isDrawByRule(state)) return emptyList()
+        return moves
+    }
+
+    /** True when the fifty-move rule or threefold repetition has ended the game. */
+    internal fun isDrawByRule(state: ChessState): Boolean =
+        state.halfmoveClock >= 100 || isThreefoldRepetition(state)
+
+    /** Whether the side to move has at least one move that does not leave its king in check. */
+    internal fun hasLegalMove(state: ChessState): Boolean {
+        val turn = state.agentTurn.toInt()
+        return generatePseudoLegal(state, turn).any { !isInCheck(movePieces(state, it), turn) }
+    }
+
+    /**
+     * The legal captures and promotions of the side to move, for a quiescence search. It does
+     * not check whether the game is over; callers check [hasLegalMove] and [isDrawByRule].
+     */
+    internal fun legalCapturesAndPromotions(state: ChessState): List<ChessAction> {
+        val turn = state.agentTurn.toInt()
+        val moves = ArrayList<ChessAction>()
+        for (move in generatePseudoLegal(state, turn)) {
+            if (!isCaptureOrPromotion(state, move)) continue
+            if (!isInCheck(movePieces(state, move), turn)) moves.add(move)
         }
-        if (state.halfmoveClock >= 100 || isThreefoldRepetition(state)) {
-            return legal
-        }
-        legal[state.agentTurn.toInt()].addAll(moves)
-        return legal
+        return moves
+    }
+
+    /** Whether [move] takes a piece, en passant included, or promotes a pawn. */
+    internal fun isCaptureOrPromotion(state: ChessState, move: ChessAction): Boolean {
+        if (move.promotion != 0 || state.get(move.toX, move.toY) != ChessState.EMPTY) return true
+        return ChessState.type(state.get(move.fromX, move.fromY)) == ChessState.PAWN && move.fromX != move.toX
     }
 
     /**
@@ -130,10 +164,10 @@ class ChessSimulator : Simulator<ChessState, ChessAction> {
         return false
     }
 
-    private fun generateLegalActions(state: ChessState): Set<ChessAction> {
+    private fun generateLegalActions(state: ChessState): List<ChessAction> {
         val turn = state.agentTurn.toInt()
         val pseudo = generatePseudoLegal(state, turn)
-        val legal = mutableSetOf<ChessAction>()
+        val legal = ArrayList<ChessAction>(pseudo.size)
         for (move in pseudo) {
             val next = movePieces(state, move)
             if (!isInCheck(next, turn)) {

@@ -9,7 +9,7 @@ Everything is under `src/main/kotlin/com/castlefrog/agl`.
 - **Core** (`com.castlefrog.agl`) — the interfaces `Simulator`, `State`, `Action`, `Agent`, plus `History`, `IllegalActionException`, and `requireLegalAction`, which every simulator calls to validate its actions list.
 - **util** — extension helpers on `LegalActions` (a `List<Set<A>>`).
 - **agents** — `Agent` implementations. Depend only on core and util. `MctsAgent` is configured by `MctsConfig`, and takes its domain-specific hooks, `PlayoutPolicy` and `StateEvaluator`, as interfaces from this package so domain code can supply them without core depending on domains.
-- **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains.
+- **domains** — one package per game, each with an `Action`, a `State`, and a `Simulator`. `domains/Util.kt` holds `AdversarialRewards` and `nextPlayerTurnSequential`, shared by the two-player domains. A domain may also hold its own agent.
 
 Dependencies point inward: domains and agents depend on core; core depends on nothing here.
 
@@ -23,6 +23,8 @@ Domain-specific state:
 - Go keeps the board colorings seen so far in the state for superko, and a pass counter.
 - Chess keeps castling rights, en-passant file, the halfmove clock, and the position keys seen since the last pawn move or capture (for threefold repetition) in the state.
 - Connect 4 and Hex use bit operations for win checks.
+
+Domain-specific agents live in their domain's package. `ChessAlphaBetaAgent` is in `domains/chess` so it can use the simulator's `internal` move helpers. `legalMoves` is the move list behind `calculateLegalActions`. `applyMove` plays a move already known to be legal, still on a copy. `hasLegalMove` generates the pseudo-legal moves and stops checking at the first legal one, and `legalCapturesAndPromotions` tests only captures and promotions for check. They skip the per-player sets and the second legality check in `stateTransition`.
 
 ## Build
 

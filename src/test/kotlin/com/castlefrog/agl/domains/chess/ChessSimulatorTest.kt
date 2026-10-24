@@ -584,4 +584,27 @@ class ChessSimulatorTest {
         assertIllegal(simulator, state, whiteKnightOut)
         assertIllegal(simulator, state, ChessAction(4, 1, 4, 3)) // e2-e4
     }
+
+    @Test
+    fun searchHelpersAgreeWithLegalActionsDuringRandomGames() {
+        val simulator = ChessSimulator()
+        val random = kotlin.random.Random(3)
+        repeat(20) {
+            var state = simulator.initialState
+            var ply = 0
+            while (ply < 200) {
+                val legal = simulator.calculateLegalActions(state)[state.agentTurn.toInt()]
+                if (!simulator.isDrawByRule(state)) {
+                    assertEquals(legal.isNotEmpty(), simulator.hasLegalMove(state))
+                    assertEquals(
+                        legal.filter { simulator.isCaptureOrPromotion(state, it) }.toSet(),
+                        simulator.legalCapturesAndPromotions(state).toSet()
+                    )
+                }
+                if (legal.isEmpty()) break
+                state = simulator.applyMove(state, legal.random(random))
+                ply++
+            }
+        }
+    }
 }

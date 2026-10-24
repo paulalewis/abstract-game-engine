@@ -53,6 +53,13 @@ Domain rules and options may be revised.
   - Hooks: a `PlayoutPolicy` picks playout moves and reports, by returning null, when a playout state is truly terminal (default `UniformRandomPlayoutPolicy`); a policy that wants to stop early uses a `StateEvaluator` instead, and a joint action of the wrong shape throws `IllegalActionException` from `stateTransition`; the agent computes no legal actions for playout states itself, so a policy can avoid full legal-move generation. An optional `StateEvaluator` can end a playout with estimated rewards. Tree nodes compute their legal actions when first chosen from, not when added.
   - Playout cap: a playout stops after `maxPlayoutLength` steps. It is then scored by the evaluator if there is one, and otherwise as neutral, 0 for every player.
   - Takes a `Random`; a seeded agent repeats its moves. The search tree is local to each call, so a call can run on a background thread; one instance should not run two searches at once with a seeded `Random`.
+- `ChessAlphaBetaAgent` (in `domains.chess`) — plays chess only, and throws `IllegalArgumentException` for another domain. It returns null when it is not the player's turn or the game is over.
+  - Search: negamax with alpha-beta and iterative deepening, then a quiescence search over captures and promotions (and every reply when in check). Evaluation is material plus piece-square tables, in centipawns.
+  - Game ends are scored from `ChessSimulator.calculateRewards`, so the agent knows exactly the draws the simulator has: stalemate, the fifty-move rule and threefold repetition. A mate `n` plies away scores `MATE_SCORE - n`.
+  - Budget: `maxDepth` in plies, `timeLimitMillis` (0 for none), and an `isCancelled` callback that another thread can use to stop the search. The move comes from the last depth searched in full. Stopped before depth 1 finishes, it returns the best move found so far, or the first legal move.
+  - Strength: `ChessStrength` levels (`BEGINNER` to `EXPERT`) set a depth, a time limit, a margin and a temperature. At a level with a margin, the agent picks among root moves scored within the margin of the best, by a softmax over their scores at that temperature. It always plays a forced mate.
+  - `search(state)` returns a `ChessSearchResult`: the move, its score, the depth completed, the nodes visited and the time taken.
+  - With a seeded `Random` and no time limit, the same position gives the same move.
 
 ## Non-goals
 
