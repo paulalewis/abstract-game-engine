@@ -47,6 +47,13 @@ Domain rules and options may be revised.
 ## Agents
 
 - `RandomAgent` — picks a legal action uniformly at random. Takes an optional `Random` for reproducible play.
+- `ChessAlphaBetaAgent` (in `domains.chess`) — plays chess only, and throws `IllegalArgumentException` for another domain. It returns null when it is not the player's turn or the game is over.
+  - Search: negamax with alpha-beta and iterative deepening, then a quiescence search over captures and promotions (and every reply when in check). Evaluation is material plus piece-square tables, in centipawns.
+  - Game ends are scored from `ChessSimulator.calculateRewards`, so the agent knows exactly the draws the simulator has: stalemate, the fifty-move rule and threefold repetition. A mate `n` plies away scores `MATE_SCORE - n`.
+  - Budget: `maxDepth` in plies, `timeLimitMillis` (0 for none), and an `isCancelled` callback that another thread can use to stop the search. The move comes from the last depth searched in full. Stopped before depth 1 finishes, it returns the best move found so far, or the first legal move.
+  - Strength: `ChessStrength` levels (`BEGINNER` to `EXPERT`) set a depth, a time limit, a margin and a temperature. At a level with a margin, the agent picks among root moves scored within the margin of the best, by a softmax over their scores at that temperature. It always plays a forced mate.
+  - `search(state)` returns a `ChessSearchResult`: the move, its score, the depth completed, the nodes visited and the time taken.
+  - With a seeded `Random` and no time limit, the same position gives the same move.
 
 ## Non-goals
 

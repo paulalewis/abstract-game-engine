@@ -56,6 +56,14 @@ A ring may enclose empty cells, the opponent's stones, or the player's own stone
 
 Chess's fifty-move rule and threefold repetition, and the draughts draw rules, end the game as soon as the condition holds, with neutral rewards and no legal actions. Over the board a player must claim these draws; here no player can claim, and agents doing random playouts would otherwise never finish drawn endgames such as king against king. A player with no legal move still loses on the same turn, and a chess mate still wins even if it also completes a repetition.
 
+## The chess agent weakens by sampling near-best moves
+
+`ChessAlphaBetaAgent` levels set the depth and time first. A shallow search alone plays oddly rather than weakly: it never errs at depth 1 when a capture is there, and it never loses a tactic it can see. So the weak levels also pick among the root moves scored within a margin of the best, by a softmax over their scores at a temperature. This is the same idea as a softmax over visit counts in Monte Carlo tree search. The margin keeps the mistakes small. Mates are always played, so a weak level does not toss a win it has found. Scores within the margin are exact because the root searches with its lower bound lowered by the margin.
+
+## The chess agent uses killer moves but no transposition table
+
+Killer moves cut the nodes searched by 2 to 6 times with the same results, at almost no cost. A transposition table needs a cheap position hash, and the position key is a 64-character string, so it is left out until a Zobrist hash is worth adding.
+
 ## Draw history lives in the state
 
 Draughts and chess repetition need earlier positions. They are kept in `DraughtsState` and `ChessState`, reset by any man or pawn move or capture, not in the simulator, so a state reached by different paths or reused in a search gives the same answer. See "No caches in simulators."

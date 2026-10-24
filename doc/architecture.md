@@ -22,6 +22,8 @@ Domain-specific state:
 - Draughts tracks an unfinished multi-jump (`mustContinueFromX`, pending captures) in the state. For the draw rules it also keeps the positions since the last man move or capture, a king-move counter, and the endgame material group with its move counter; these update only when a turn ends.
 - Go keeps the board colorings seen so far in the state for superko, and a pass counter.
 - Chess keeps castling rights, en-passant file, the halfmove clock, and the position keys seen since the last pawn move or capture (for threefold repetition) in the state.
+
+Domain-specific agents live in their domain's package. `ChessAlphaBetaAgent` is in `domains/chess` so it can use the simulator's `internal` move helpers. `legalMoves` is the move list behind `calculateLegalActions`. `applyMove` plays a move already known to be legal, still on a copy. `hasLegalMove` stops at the first legal move, and `legalCapturesAndPromotions` tests only captures and promotions for check. They skip the per-player sets and the second legality check in `stateTransition`.
 - Connect 4 and Hex use bit operations for win checks.
 
 ## Build
